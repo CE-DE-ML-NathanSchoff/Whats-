@@ -3,7 +3,7 @@ import json
 
 def send_discord_invite():
     # 1. Paste your copied URL here
-    WEBHOOK_URL = "https://discord.com/api/webhooks/1477389940508856386/CWkaCVWwnRcSQQ_x1eb4CfPpQCzQEEjknX6WdsQBPSVxY_yXMlqIZ4Kf_XIxGGNxbSY_"
+    WEBHOOK_URL = "discord webhook url"
     
     # 2. This is the dummy data simulating an event from your database
     event_data = {
