@@ -29,26 +29,46 @@ const poolOptions = {
 let pool = null;
 /** @type {import('snowflake-sdk').Connection | null} */
 let browserConn = null;
+/** @type {Promise<import('snowflake-sdk').Connection> | null} - in-flight connection so concurrent callers share one attempt */
+let browserConnPromise = null;
+
+/**
+ * Clear the cached browser connection so the next getBrowserConnection() will reconnect.
+ * Call this when a query fails so stale/dead connections are not reused.
+ */
+function clearBrowserConnection() {
+  browserConn = null;
+  browserConnPromise = null;
+}
 
 /**
  * Get a connected connection when using EXTERNALBROWSER (opens browser once, then reuses).
  * Required because the driver's pool uses connect(), but EXTERNALBROWSER requires connectAsync().
+ * Uses a shared pending promise so concurrent requests before the first connectAsync completes
+ * all wait on the same connection attempt instead of starting multiple browser auth flows.
+ * If the cached connection becomes stale (e.g. session timeout, network failure), clearBrowserConnection()
+ * is called on query failure so the next call will reconnect.
  */
 function getBrowserConnection() {
   if (browserConn) return Promise.resolve(browserConn);
+  if (browserConnPromise) return browserConnPromise;
   if (!connectionOptions.account || !connectionOptions.username) {
     return Promise.reject(new Error('Missing Snowflake config: set SNOWFLAKE_ACCOUNT and SNOWFLAKE_USERNAME in .env for browser auth'));
   }
   const conn = snowflake.createConnection(connectionOptions);
-  return new Promise((resolve, reject) => {
+  browserConnPromise = new Promise((resolve, reject) => {
     conn.connectAsync((err, c) => {
-      if (err) reject(err);
-      else {
+      if (err) {
+        browserConnPromise = null; // allow retry on next call
+        reject(err);
+      } else {
         browserConn = c;
+        browserConnPromise = null;
         resolve(c);
       }
     });
   });
+  return browserConnPromise;
 }
 
 /**
@@ -58,7 +78,12 @@ export function getPool() {
   if (useBrowserAuth) {
     return {
       use(fn) {
-        return getBrowserConnection().then((conn) => fn(conn));
+        return getBrowserConnection()
+          .then((conn) => fn(conn))
+          .catch((err) => {
+            clearBrowserConnection();
+            throw err;
+          });
       },
     };
   }
@@ -78,25 +103,13 @@ export function getPool() {
  * @returns {Promise<{ rows: Array, statement: object }>}
  */
 export function execute(sqlText, binds = []) {
-  // #region agent log
-  fetch('http://127.0.0.1:7845/ingest/7de3d914-7760-4475-bfb8-cab4b17760b2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'46a376'},body:JSON.stringify({sessionId:'46a376',location:'snowflake.js:execute',message:'execute called',data:{sqlPreview:String(sqlText).slice(0,60)},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
-  // #endregion
   const pool = getPool();
   return pool.use((conn) => {
-    // #region agent log
-    console.log('[DEBUG] pool.use callback invoked, conn acquired');
-    fetch('http://127.0.0.1:7845/ingest/7de3d914-7760-4475-bfb8-cab4b17760b2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'46a376'},body:JSON.stringify({sessionId:'46a376',location:'snowflake.js:pool.use',message:'conn acquired',data:{},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
     return new Promise((resolve, reject) => {
-      console.log('[DEBUG] calling conn.execute');
       conn.execute({
         sqlText,
         binds: binds.length ? binds : undefined,
         complete: (err, stmt, rows) => {
-          console.log('[DEBUG] complete callback invoked', err ? err.message : 'ok');
-          // #region agent log
-          fetch('http://127.0.0.1:7845/ingest/7de3d914-7760-4475-bfb8-cab4b17760b2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'46a376'},body:JSON.stringify({sessionId:'46a376',location:'snowflake.js:complete',message:'complete callback',data:{hasErr:!!err,errMessage:err?err.message:null},timestamp:Date.now(),hypothesisId:'B,C,E'})}).catch(()=>{});
-          // #endregion
           if (err) reject(err);
           else resolve({ rows: rows || [], statement: stmt });
         },
