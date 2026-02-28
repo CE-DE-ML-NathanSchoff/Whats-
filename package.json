@@ -1,0 +1,26 @@
+{
+  "name": "comunitree-backend",
+  "version": "1.0.0",
+  "description": "Comunitree - JavaScript backend with Snowflake",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "init-db": "node src/db/init.js",
+    "migrate-private-friends": "node src/db/migratePrivateAndFriends.js",
+    "seed-locations": "node src/db/seedLocations.js"
+  },
+  "keywords": ["comunitree", "snowflake", "express"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0",
+    "express-validator": "^7.0.1",
+    "jsonwebtoken": "^9.0.2",
+    "snowflake-sdk": "^1.15.0"
+  }
+}
