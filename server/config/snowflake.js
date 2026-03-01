@@ -1,6 +1,32 @@
 import snowflake from 'snowflake-sdk';
 
 const useBrowserAuth = process.env.SNOWFLAKE_AUTHENTICATOR === 'EXTERNALBROWSER';
+const useKeyPairAuth = process.env.SNOWFLAKE_AUTHENTICATOR === 'SNOWFLAKE_JWT';
+
+/** Resolve private key for SNOWFLAKE_JWT: from PEM string (env) or file path. */
+function getPrivateKeyOption() {
+  const path = process.env.SNOWFLAKE_PRIVATE_KEY_PATH;
+  if (path) {
+    return {
+      privateKeyPath: path,
+      ...(process.env.SNOWFLAKE_PRIVATE_KEY_PASS && { privateKeyPass: process.env.SNOWFLAKE_PRIVATE_KEY_PASS }),
+    };
+  }
+  const raw = process.env.SNOWFLAKE_PRIVATE_KEY;
+  if (!raw || !raw.trim()) return null;
+  let pem = raw.trim();
+  if (!pem.includes('-----BEGIN')) {
+    try {
+      pem = Buffer.from(pem, 'base64').toString('utf8');
+    } catch (_) {
+      return null;
+    }
+  }
+  pem = pem.replace(/\\n/g, '\n');
+  return { privateKey: pem };
+}
+
+const keyPairOpts = useKeyPairAuth ? getPrivateKeyOption() : null;
 
 const connectionOptions = {
   account: process.env.SNOWFLAKE_ACCOUNT,
@@ -11,13 +37,13 @@ const connectionOptions = {
   schema: process.env.SNOWFLAKE_SCHEMA || 'PUBLIC',
   role: process.env.SNOWFLAKE_ROLE || 'ACCOUNTADMIN',
   application: 'COMUNITREE_BACKEND',
-  // MFA: set SNOWFLAKE_AUTHENTICATOR=USERNAME_PASSWORD_MFA and SNOWFLAKE_PASSCODE=<current TOTP code>
-  // Browser: set SNOWFLAKE_AUTHENTICATOR=EXTERNALBROWSER to sign in via web browser (no password in .env needed)
+  // MFA: SNOWFLAKE_AUTHENTICATOR=USERNAME_PASSWORD_MFA + SNOWFLAKE_PASSCODE (prompted on --init-db if unset)
+  // Key-pair (24/7): SNOWFLAKE_AUTHENTICATOR=SNOWFLAKE_JWT + SNOWFLAKE_PRIVATE_KEY or SNOWFLAKE_PRIVATE_KEY_PATH
+  // Browser: SNOWFLAKE_AUTHENTICATOR=EXTERNALBROWSER
   ...(process.env.SNOWFLAKE_AUTHENTICATOR && { authenticator: process.env.SNOWFLAKE_AUTHENTICATOR }),
   ...(process.env.SNOWFLAKE_PASSCODE && { passcode: process.env.SNOWFLAKE_PASSCODE }),
-  // Use console login URL so the driver opens Snowflake's login page (works with MFA/passkey); avoids SDK bug when SSO URL API returns null
+  ...(keyPairOpts && keyPairOpts),
   ...(useBrowserAuth && { disableConsoleLogin: false }),
-  // Give more time for browser login + MFA/passkey (default 2 min often too short)
   ...(useBrowserAuth && { browserActionTimeout: 300000 }),
 };
 
@@ -88,8 +114,15 @@ export function getPool() {
     };
   }
   if (!pool) {
-    if (!connectionOptions.account || !connectionOptions.username || !connectionOptions.password) {
-      throw new Error('Missing Snowflake config: set SNOWFLAKE_ACCOUNT, SNOWFLAKE_USERNAME, SNOWFLAKE_PASSWORD in .env');
+    const hasPassword = connectionOptions.password;
+    const hasKeyPair = useKeyPairAuth && (connectionOptions.privateKey || connectionOptions.privateKeyPath);
+    if (!connectionOptions.account || !connectionOptions.username) {
+      throw new Error('Missing Snowflake config: set SNOWFLAKE_ACCOUNT and SNOWFLAKE_USERNAME in .env');
+    }
+    if (!hasPassword && !hasKeyPair) {
+      throw new Error(
+        'Missing Snowflake auth: set SNOWFLAKE_PASSWORD, or for key-pair (24/7) set SNOWFLAKE_AUTHENTICATOR=SNOWFLAKE_JWT and SNOWFLAKE_PRIVATE_KEY or SNOWFLAKE_PRIVATE_KEY_PATH'
+      );
     }
     pool = snowflake.createPool(connectionOptions, poolOptions);
   }

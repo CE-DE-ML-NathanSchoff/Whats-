@@ -164,11 +164,12 @@ if [ "$RUN_INIT_DB" = "1" ]; then
   # #endregion
   debug "Step 4a: Running Snowflake schema init"
   echo "Running one-time DB init (Snowflake schema)..."
-  echo "If MFA is required and SNOWFLAKE_PASSCODE is not set, you will be prompted for the 6-digit code."
-  INIT_ERR=$(docker run -it --rm --env-file "$ENV_FILE" "$IMAGE" node server/db/init.js 2>&1); INIT_RET=$?
+  echo "With key-pair (default): you will be prompted for your MFA code once; init-db creates a key and writes it to a volume so the app can use it 24/7."
+  KEY_VOLUME="${KEY_VOLUME:-comunitree_snowflake_keys}"
+  INIT_ERR=$(docker run -it --rm -v "${KEY_VOLUME}:/secrets" --env-file "$ENV_FILE" -e SNOWFLAKE_PRIVATE_KEY_PATH=/secrets/snowflake_rsa_key.p8 "$IMAGE" node server/db/init.js 2>&1); INIT_RET=$?
   if [ "$INIT_RET" -ne 0 ]; then
     dbg_log "step_failed" "\"step\":4,\"error\":\"$(sanitize_err "$INIT_ERR")\""
-    echo "DB init failed. Fix .env (e.g. Snowflake credentials, MFA passcode) and run again with --init-db." >&2
+    echo "DB init failed. Fix .env (Snowflake credentials, key path, or MFA) and run again with --init-db." >&2
     echo "$INIT_ERR" >&2
     show_docker_permission_hint "$INIT_ERR" "$@"
     exit 1
@@ -206,12 +207,17 @@ debug "Step 7: Running container"
 DETACH="-d"
 [ "$FOREGROUND" = "1" ] && DETACH=""
 
+KEY_VOLUME="${KEY_VOLUME:-comunitree_snowflake_keys}"
+KEY_ENV=""
+if grep -q 'SNOWFLAKE_AUTHENTICATOR=SNOWFLAKE_JWT' "$ENV_FILE" 2>/dev/null; then
+  KEY_ENV="-v ${KEY_VOLUME}:/secrets -e SNOWFLAKE_PRIVATE_KEY_PATH=/secrets/snowflake_rsa_key.p8"
+fi
 echo "Starting Comunitree (frontend $PORT, backend 7000)..."
 if [ "$FOREGROUND" = "1" ]; then
-  exec docker run -p "${PORT}:8000" -p "7000:7000" --name "$CONTAINER_NAME" --env-file "$ENV_FILE" --rm $DETACH "$IMAGE"
+  exec docker run -p "${PORT}:8000" -p "7000:7000" $KEY_ENV --name "$CONTAINER_NAME" --env-file "$ENV_FILE" --rm $DETACH "$IMAGE"
 fi
 
-RUN_ERR=$(docker run $DETACH -p "${PORT}:8000" -p "7000:7000" --name "$CONTAINER_NAME" --env-file "$ENV_FILE" --restart unless-stopped "$IMAGE" 2>&1); RUN_RET=$?
+RUN_ERR=$(docker run $DETACH -p "${PORT}:8000" -p "7000:7000" $KEY_ENV --name "$CONTAINER_NAME" --env-file "$ENV_FILE" --restart unless-stopped "$IMAGE" 2>&1); RUN_RET=$?
 if [ "$RUN_RET" -ne 0 ]; then
   dbg_log "step_failed" "\"step\":7,\"error\":\"$(sanitize_err "$RUN_ERR")\""
   echo "Error: failed to run container" >&2

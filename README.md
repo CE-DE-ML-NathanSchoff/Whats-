@@ -39,8 +39,9 @@ Copy `.env.example` to `.env` and set:
 - `SNOWFLAKE_ACCOUNT` — account identifier (e.g. `orgname-account` or `xy12345.us-east-1`)
 - `SNOWFLAKE_USERNAME` — Snowflake user
 - `SNOWFLAKE_PASSWORD` — Snowflake password
-- **MFA (recommended)**: set `SNOWFLAKE_AUTHENTICATOR=USERNAME_PASSWORD_MFA`. Put the current 6-digit code from your authenticator app in `SNOWFLAKE_PASSCODE`, or leave it unset and `npm run init-db` will prompt you.
-- **Browser login**: set `SNOWFLAKE_AUTHENTICATOR=EXTERNALBROWSER` to sign in via browser (passkey/MFA may redirect away; use MFA passcode if init times out).
+- **Key-pair (default, 24/7)**: `SNOWFLAKE_AUTHENTICATOR=SNOWFLAKE_JWT` and `SNOWFLAKE_PRIVATE_KEY_PATH=./snowflake_rsa_key.p8`. On first `npm run init-db` you are prompted for your MFA code once; init-db generates a key pair, registers it with Snowflake, and writes the private key to that path. After that, the app uses the key only (no MFA, no container dependency).
+- **MFA only**: set `SNOWFLAKE_AUTHENTICATOR=USERNAME_PASSWORD_MFA`; leave `SNOWFLAKE_PASSCODE` unset and init-db will prompt. Not suitable for long-running servers (TOTP expires every 30s).
+- **Browser login**: set `SNOWFLAKE_AUTHENTICATOR=EXTERNALBROWSER` to sign in via browser (not for headless/Docker).
 - `SNOWFLAKE_WAREHOUSE` — e.g. `COMPUTE_WH`
 - `SNOWFLAKE_DATABASE` — e.g. `COMUNITREE`
 - `SNOWFLAKE_SCHEMA` — e.g. `PUBLIC`
@@ -48,7 +49,7 @@ Copy `.env.example` to `.env` and set:
 
 ### 3. Initialize Snowflake schema
 
-Creates the `users`, `communities`, `events`, `event_waters`, and related tables:
+Creates the `users`, `communities`, `events`, `event_waters`, and related tables. With key-pair (default), the first run prompts for your MFA code once, then generates and registers a key and creates the schema; later runs and the app use the key file only.
 
 ```bash
 npm run init-db
@@ -165,6 +166,8 @@ Use `Authorization: Bearer <token>` for protected routes.
 ## Snowflake
 
 Data is stored in Snowflake using the official [Node.js driver](https://docs.snowflake.com/en/developer-guide/node-js/nodejs-driver). The app uses a connection pool; ensure the configured warehouse and database exist and the user has privileges to create tables and run DML.
+
+**24/7 and long-running servers:** If your Snowflake user has MFA (TOTP), the passcode expires every 30–60 seconds, so it is not suitable for a long-running app. Use either **(1) key-pair authentication** (`SNOWFLAKE_AUTHENTICATOR=SNOWFLAKE_JWT` with `SNOWFLAKE_PRIVATE_KEY` or `SNOWFLAKE_PRIVATE_KEY_PATH`) or **(2) a dedicated Snowflake user without MFA** (e.g. a service account with password only). See [.env.example](.env.example) and [Snowflake key-pair auth](https://docs.snowflake.com/en/user-guide/key-pair-auth).
 
 To add more user or event fields later, extend the tables in Snowflake (e.g. `ALTER TABLE users ADD COLUMN ...`) and update the corresponding services and route validation in `server/`.
 

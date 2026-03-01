@@ -1,11 +1,13 @@
 /**
  * Initialize Comunitree schema in Snowflake.
  * Run once: npm run init-db
- * Ensure COMUNITREE database and warehouse exist in Snowflake first.
+ * When using key-pair (default): on first run, prompts for MFA once to register a new key, then creates the key file and schema. After that, no MFA needed (24/7).
  */
 import 'dotenv/config';
 import readline from 'readline';
-
+import crypto from 'crypto';
+import fs from 'fs';
+import path from 'path';
 /** If using MFA without passcode in .env, prompt for it so we set it before loading snowflake config. */
 function promptForMfaPasscode() {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
@@ -15,6 +17,47 @@ function promptForMfaPasscode() {
       resolve((code || '').trim());
     });
   });
+}
+
+/** Resolve private key path: env or default next to project root. */
+function getPrivateKeyPath() {
+  const envPath = process.env.SNOWFLAKE_PRIVATE_KEY_PATH;
+  if (envPath) return path.isAbsolute(envPath) ? envPath : path.resolve(process.cwd(), envPath);
+  return path.resolve(process.cwd(), 'snowflake_rsa_key.p8');
+}
+
+/** Generate RSA key pair and return { publicKeyPem, privateKeyPem }. */
+function generateKeyPair() {
+  const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', {
+    modulusLength: 2048,
+    publicKeyEncoding: { type: 'spki', format: 'pem' },
+    privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+  });
+  return { publicKeyPem: publicKey, privateKeyPem: privateKey };
+}
+
+/**
+ * Setup key-pair for 24/7 auth: generate keys, register public key in Snowflake, write private key to file.
+ * Call this when already connected with MFA/password (execute works).
+ */
+async function setupKeyPair(execute, keyPath) {
+  const username = process.env.SNOWFLAKE_USERNAME;
+  if (!username) {
+    throw new Error('SNOWFLAKE_USERNAME is required to set up key-pair');
+  }
+  console.log('Generating RSA key pair for key-pair auth (24/7)...');
+  const { publicKeyPem, privateKeyPem } = generateKeyPair();
+  const escapedPem = publicKeyPem.replace(/'/g, "''").replace(/\r?\n/g, '\\n');
+  const snowflakeUser = username.toUpperCase().replace(/"/g, '');
+  const sql = `ALTER USER ${snowflakeUser} SET RSA_PUBLIC_KEY = '${escapedPem}'`;
+  await execute(sql);
+  console.log('Public key registered for user', username);
+  const dir = path.dirname(keyPath);
+  if (dir && !fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  fs.writeFileSync(keyPath, privateKeyPem, { mode: 0o600 });
+  console.log('Private key written to', keyPath);
 }
 
 const USERS_TABLE = `
@@ -172,46 +215,65 @@ CREATE TABLE IF NOT EXISTS event_waters (
 );
 `;
 
-async function init() {
-  // If MFA is required and passcode not in .env, prompt so it's set before snowflake config loads
-  if (process.env.SNOWFLAKE_AUTHENTICATOR === 'USERNAME_PASSWORD_MFA' && !process.env.SNOWFLAKE_PASSCODE) {
-    process.env.SNOWFLAKE_PASSCODE = await promptForMfaPasscode();
-  }
-  const { execute } = await import('../config/snowflake.js');
-
+/** Run schema creation (tables, etc.). */
+async function runSchema(execute) {
   const database = process.env.SNOWFLAKE_DATABASE || 'COMUNITREE';
   const schema = process.env.SNOWFLAKE_SCHEMA || 'PUBLIC';
 
+  await execute(`CREATE DATABASE IF NOT EXISTS ${database}`);
+  await execute(`USE DATABASE ${database}`);
+  await execute(`USE SCHEMA ${schema}`);
+  await execute(USERS_TABLE);
+  console.log('Table users created or already exists.');
+  await execute(USER_CONFIGS_TABLE);
+  console.log('Table user_configs created or already exists.');
+  await execute(COMMUNITIES_TABLE);
+  console.log('Table communities created or already exists.');
+  await execute(COMMUNITY_MEMBERS_TABLE);
+  console.log('Table community_members created or already exists.');
+  await execute(COMMUNITY_PARENTS_TABLE);
+  console.log('Table community_parents created or already exists.');
+  await execute(COMMUNITY_INVITES_TABLE);
+  console.log('Table community_invites created or already exists.');
+  await execute(FRIENDSHIPS_TABLE);
+  console.log('Table friendships created or already exists.');
+  await execute(EVENTS_TABLE);
+  console.log('Table events created or already exists.');
+  await execute(EVENT_RSVPS_TABLE);
+  console.log('Table event_rsvps created or already exists.');
+  await execute(EVENT_RATINGS_TABLE);
+  console.log('Table event_ratings created or already exists.');
+  await execute(EVENT_WATERS_TABLE);
+  console.log('Table event_waters created or already exists.');
+  await execute('ALTER TABLE events ADD COLUMN IF NOT EXISTS waters_count INT DEFAULT 0');
+  console.log('Column waters_count added or already exists.');
+  await execute('ALTER TABLE events ADD COLUMN IF NOT EXISTS link VARCHAR(2000)');
+  console.log('Column link added or already exists.');
+}
+
+async function init() {
+  const keyPath = getPrivateKeyPath();
+  const useJwt = process.env.SNOWFLAKE_AUTHENTICATOR === 'SNOWFLAKE_JWT';
+  const keyExists = fs.existsSync(keyPath) || !!process.env.SNOWFLAKE_PRIVATE_KEY?.trim();
+
+  if (useJwt && !keyExists) {
+    console.log('Key-pair auth is set but no key file found. Will connect with MFA once to create and register a key, then create the schema.');
+    process.env.SNOWFLAKE_AUTHENTICATOR = 'USERNAME_PASSWORD_MFA';
+    if (!process.env.SNOWFLAKE_PASSCODE) {
+      process.env.SNOWFLAKE_PASSCODE = await promptForMfaPasscode();
+    }
+  } else if (process.env.SNOWFLAKE_AUTHENTICATOR === 'USERNAME_PASSWORD_MFA' && !process.env.SNOWFLAKE_PASSCODE) {
+    process.env.SNOWFLAKE_PASSCODE = await promptForMfaPasscode();
+  }
+
+  const { execute } = await import('../config/snowflake.js');
+
   try {
-    await execute(`CREATE DATABASE IF NOT EXISTS ${database}`);
-    await execute(`USE DATABASE ${database}`);
-    await execute(`USE SCHEMA ${schema}`);
-    await execute(USERS_TABLE);
-    console.log('Table users created or already exists.');
-    await execute(USER_CONFIGS_TABLE);
-    console.log('Table user_configs created or already exists.');
-    await execute(COMMUNITIES_TABLE);
-    console.log('Table communities created or already exists.');
-    await execute(COMMUNITY_MEMBERS_TABLE);
-    console.log('Table community_members created or already exists.');
-    await execute(COMMUNITY_PARENTS_TABLE);
-    console.log('Table community_parents created or already exists.');
-    await execute(COMMUNITY_INVITES_TABLE);
-    console.log('Table community_invites created or already exists.');
-    await execute(FRIENDSHIPS_TABLE);
-    console.log('Table friendships created or already exists.');
-    await execute(EVENTS_TABLE);
-    console.log('Table events created or already exists.');
-    await execute(EVENT_RSVPS_TABLE);
-    console.log('Table event_rsvps created or already exists.');
-    await execute(EVENT_RATINGS_TABLE);
-    console.log('Table event_ratings created or already exists.');
-    await execute(EVENT_WATERS_TABLE);
-    console.log('Table event_waters created or already exists.');
-    await execute('ALTER TABLE events ADD COLUMN IF NOT EXISTS waters_count INT DEFAULT 0');
-    console.log('Column waters_count added or already exists.');
-    await execute('ALTER TABLE events ADD COLUMN IF NOT EXISTS link VARCHAR(2000)');
-    console.log('Column link added or already exists.');
+    if (useJwt && !keyExists) {
+      await setupKeyPair(execute, keyPath);
+      console.log('Key-pair setup complete. Future runs (and the app) can use SNOWFLAKE_AUTHENTICATOR=SNOWFLAKE_JWT and SNOWFLAKE_PRIVATE_KEY_PATH=' + keyPath);
+    }
+    await runSchema(execute);
     console.log('Comunitree DB init done.');
   } catch (err) {
     console.error('Init failed:', err.message);

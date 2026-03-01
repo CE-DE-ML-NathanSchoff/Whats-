@@ -12,6 +12,8 @@ client/dist/
 .env
 .env.*
 !.env.example
+snowflake_rsa_key.p8
+keys/
 
 # Logs and local state
 *.log
