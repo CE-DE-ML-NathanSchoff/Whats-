@@ -8,10 +8,6 @@ import readline from 'readline';
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
-// #region agent log
-const _dbgLog=(loc,msg,data)=>{try{fs.mkdirSync(path.dirname('/Users/lucian/Cursor/HenHacks/Whats-/.cursor/debug-c2a6d2.log'),{recursive:true});fs.appendFileSync('/Users/lucian/Cursor/HenHacks/Whats-/.cursor/debug-c2a6d2.log',JSON.stringify({sessionId:'c2a6d2',location:loc,message:msg,data,timestamp:Date.now()})+'\n');}catch(_){}};
-// #endregion
-
 /** If using MFA without passcode in .env, prompt for it so we set it before loading snowflake config. */
 function promptForMfaPasscode() {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
@@ -54,37 +50,14 @@ async function setupKeyPair(execute, keyPath) {
   const escapedPem = publicKeyPem.replace(/'/g, "''").replace(/\r?\n/g, '\\n');
   const snowflakeUser = username.toUpperCase().replace(/"/g, '');
   const sql = `ALTER USER ${snowflakeUser} SET RSA_PUBLIC_KEY = '${escapedPem}'`;
-  // #region agent log
-  _dbgLog('init.js:setupKeyPair','alter_user_sql',{hypothesisId:'H-A,H-E',publicKeyPemStart:publicKeyPem.substring(0,80),escapedPemStart:escapedPem.substring(0,80),escapedPemEnd:escapedPem.substring(escapedPem.length-60),sqlStart:sql.substring(0,120),keyPath});
-  // #endregion
-  try {
-    await execute(sql);
-  } catch (sqlErr) {
-    // #region agent log
-    _dbgLog('init.js:setupKeyPair','alter_user_FAILED',{hypothesisId:'H-A',error:sqlErr.message,sqlStart:sql.substring(0,120)});
-    // #endregion
-    throw sqlErr;
-  }
+  await execute(sql);
   console.log('Public key registered for user', username);
   const dir = path.dirname(keyPath);
-  // #region agent log
-  _dbgLog('init.js:setupKeyPair','pre_write',{hypothesisId:'H-C,H-E',keyPath,dir,dirExists:fs.existsSync(dir)});
-  // #endregion
   if (dir && !fs.existsSync(dir)) {
-    try {
-      fs.mkdirSync(dir, { recursive: true });
-    } catch (mkdirErr) {
-      // #region agent log
-      _dbgLog('init.js:setupKeyPair','mkdir_FAILED',{hypothesisId:'H-C',dir,error:mkdirErr.message});
-      // #endregion
-      throw mkdirErr;
-    }
+    fs.mkdirSync(dir, { recursive: true });
   }
   try {
     fs.writeFileSync(keyPath, privateKeyPem, { mode: 0o600 });
-    // #region agent log
-    _dbgLog('init.js:setupKeyPair','key_written_OK',{hypothesisId:'H-C',keyPath,fileExists:fs.existsSync(keyPath)});
-    // #endregion
     console.log('Private key written to', keyPath);
   } catch (writeErr) {
     const fallback = path.join(process.cwd(), 'snowflake_rsa_key.p8');
@@ -179,7 +152,6 @@ CREATE TABLE IF NOT EXISTS community_invites (
   invitee_id VARCHAR(36) NOT NULL,
   status VARCHAR(20) NOT NULL DEFAULT 'pending',
   created_at TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP(),
-  CONSTRAINT chk_invite_status CHECK (status IN ('pending', 'accepted', 'declined')),
   CONSTRAINT fk_invite_community FOREIGN KEY (community_id) REFERENCES communities(id),
   CONSTRAINT fk_invite_inviter FOREIGN KEY (inviter_id) REFERENCES users(id),
   CONSTRAINT fk_invite_invitee FOREIGN KEY (invitee_id) REFERENCES users(id),
@@ -194,7 +166,6 @@ CREATE TABLE IF NOT EXISTS friendships (
   addressee_id VARCHAR(36) NOT NULL,
   status VARCHAR(20) NOT NULL DEFAULT 'pending',
   created_at TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP(),
-  CONSTRAINT chk_friendship_status CHECK (status IN ('pending', 'accepted', 'declined')),
   CONSTRAINT fk_friendship_requester FOREIGN KEY (requester_id) REFERENCES users(id),
   CONSTRAINT fk_friendship_addressee FOREIGN KEY (addressee_id) REFERENCES users(id),
   CONSTRAINT uq_friendship_pair UNIQUE (requester_id, addressee_id)
@@ -240,7 +211,6 @@ CREATE TABLE IF NOT EXISTS event_ratings (
   rating INT NOT NULL,
   created_at TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP(),
   PRIMARY KEY (event_id, user_id),
-  CONSTRAINT chk_rating_range CHECK (rating >= 1 AND rating <= 5),
   CONSTRAINT fk_rating_event FOREIGN KEY (event_id) REFERENCES events(id),
   CONSTRAINT fk_rating_user FOREIGN KEY (user_id) REFERENCES users(id)
 );
@@ -301,9 +271,6 @@ async function init() {
   const keyExists = pathSet ? fs.existsSync(keyPath) : !!process.env.SNOWFLAKE_PRIVATE_KEY?.trim();
 
   const needsKeySetup = useJwt && !keyExists;
-  // #region agent log
-  _dbgLog('init.js:init','env_state',{hypothesisId:'H-A,H-B,H-C,H-D',authenticator:process.env.SNOWFLAKE_AUTHENTICATOR,keyPath,useJwt,pathSet,keyExists,needsKeySetup,hasPasscode:!!process.env.SNOWFLAKE_PASSCODE,hasPassword:!!process.env.SNOWFLAKE_PASSWORD,account:process.env.SNOWFLAKE_ACCOUNT,username:process.env.SNOWFLAKE_USERNAME,isTTY:!!process.stdin.isTTY});
-  // #endregion
 
   if (needsKeySetup) {
     console.log('Key-pair auth is set but no key file found. Will connect with MFA once to create and register a key, then create the schema.');
@@ -317,9 +284,6 @@ async function init() {
       }
       process.env.SNOWFLAKE_PASSCODE = await promptForMfaPasscode();
     }
-    // #region agent log
-    _dbgLog('init.js:needsKeySetup','after_mfa_prompt',{hypothesisId:'H-B',newAuth:process.env.SNOWFLAKE_AUTHENTICATOR,hasPasscode:!!process.env.SNOWFLAKE_PASSCODE,keyPathDeleted:!process.env.SNOWFLAKE_PRIVATE_KEY_PATH});
-    // #endregion
   } else if (process.env.SNOWFLAKE_AUTHENTICATOR === 'USERNAME_PASSWORD_MFA' && !process.env.SNOWFLAKE_PASSCODE?.trim()) {
     if (!process.stdin.isTTY) {
       console.error('Cannot prompt for MFA: stdin is not a TTY. Set SNOWFLAKE_PASSCODE in .env or run with -it.');
@@ -338,9 +302,6 @@ async function init() {
     await runSchema(execute);
     console.log('Comunitree DB init done.');
   } catch (err) {
-    // #region agent log
-    _dbgLog('init.js:init','INIT_FAILED',{error:err.message,stack:err.stack?.substring(0,500)});
-    // #endregion
     console.error('Init failed:', err.message);
     process.exit(1);
   }
