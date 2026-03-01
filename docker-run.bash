@@ -138,7 +138,8 @@ if [ "$need_env_prompt" = "1" ]; then
         "$ENV_EXAMPLE" > "$ENV_FILE"
   fi
   echo ""
-  echo ".env has been updated. For MFA, edit .env and set SNOWFLAKE_AUTHENTICATOR=USERNAME_PASSWORD_MFA and SNOWFLAKE_PASSCODE before running --init-db."
+  echo ".env has been updated. Run --init-db to generate and save the Snowflake key pair."
+  echo "For MFA, edit .env and set SNOWFLAKE_AUTHENTICATOR=USERNAME_PASSWORD_MFA and SNOWFLAKE_PASSCODE before running --init-db."
   echo ""
 fi
 
@@ -157,51 +158,23 @@ if [ "$PULL_RET" -ne 0 ]; then
   exit 1
 fi
 
-# --- Step 3.5: Ensure key volume directory and permissions ---
-KEY_VOLUME="${KEY_VOLUME:-comunitree_snowflake_keys}"
-KEY_PATH="/secrets/snowflake_rsa_key.p8"
-
-ensure_secrets_volume() {
-  debug "Ensuring /secrets dir exists with correct permissions in volume ${KEY_VOLUME}"
-  docker volume create "$KEY_VOLUME" >/dev/null 2>&1 || true
-  docker run --rm -v "${KEY_VOLUME}:/secrets" "$IMAGE" sh -c \
-    'mkdir -p /secrets && chmod 777 /secrets' 2>/dev/null || true
-}
-
-fix_key_permissions() {
-  debug "Fixing permissions on $KEY_PATH inside volume ${KEY_VOLUME}"
-  docker run --rm -v "${KEY_VOLUME}:/secrets" "$IMAGE" sh -c \
-    "[ -f $KEY_PATH ] && chmod 644 $KEY_PATH || true" 2>/dev/null || true
-}
-
-verify_key_readable() {
-  debug "Verifying $KEY_PATH exists and is readable"
-  local check
-  check=$(docker run --rm -v "${KEY_VOLUME}:/secrets" "$IMAGE" sh -c \
-    "if [ ! -f $KEY_PATH ]; then echo MISSING; elif [ ! -r $KEY_PATH ]; then echo UNREADABLE; else echo OK; fi" 2>&1)
-  case "$check" in
-    MISSING)
-      echo "Warning: $KEY_PATH does not exist in volume '${KEY_VOLUME}'." >&2
-      echo "  Run with --init-db to generate the Snowflake key pair." >&2
-      return 1 ;;
-    UNREADABLE)
-      echo "Warning: $KEY_PATH exists but is not readable. Attempting to fix permissions..." >&2
-      fix_key_permissions
-      local recheck
-      recheck=$(docker run --rm -v "${KEY_VOLUME}:/secrets" "$IMAGE" sh -c \
-        "[ -r $KEY_PATH ] && echo OK || echo FAIL" 2>&1)
-      if [ "$recheck" != "OK" ]; then
-        echo "Error: Could not fix permissions on $KEY_PATH." >&2
-        echo "  Try manually: docker run --rm -v ${KEY_VOLUME}:/secrets alpine chmod 644 $KEY_PATH" >&2
-        return 1
-      fi
-      echo "Permissions fixed." ;;
-    OK) debug "Key file is present and readable." ;;
-    *)
-      echo "Warning: Could not verify key file (volume may not exist yet). Output: $check" >&2
-      return 1 ;;
-  esac
-  return 0
+# --- Step 3.5: Helper to inject the private key into .env as base64 ---
+inject_key_into_env() {
+  local pem="$1"
+  if [ -z "$pem" ]; then
+    echo "Warning: no private key content to inject into .env." >&2
+    return 1
+  fi
+  local key_b64
+  key_b64=$(printf '%s' "$pem" | base64 | tr -d '\n')
+  # Remove any existing SNOWFLAKE_PRIVATE_KEY or SNOWFLAKE_PRIVATE_KEY_PATH lines, then append the new key
+  local tmpfile="${ENV_FILE}.tmp.$$"
+  grep -v '^SNOWFLAKE_PRIVATE_KEY_PATH=' "$ENV_FILE" | grep -v '^SNOWFLAKE_PRIVATE_KEY=' > "$tmpfile" || true
+  # Also strip comment-only lines about the old key-path approach
+  echo "SNOWFLAKE_PRIVATE_KEY=${key_b64}" >> "$tmpfile"
+  mv "$tmpfile" "$ENV_FILE"
+  debug "Injected SNOWFLAKE_PRIVATE_KEY (base64, ${#key_b64} chars) into .env"
+  echo "Private key saved to .env as SNOWFLAKE_PRIVATE_KEY (base64-encoded)."
 }
 
 # --- Step 4: Optional DB init ---
@@ -211,22 +184,40 @@ if [ "$RUN_INIT_DB" = "1" ]; then
   # #endregion
   debug "Step 4a: Running Snowflake schema init"
   echo "Running one-time DB init (Snowflake schema)..."
-  echo "With key-pair (default): you will be prompted for your MFA code once; init-db creates a key and writes it to a volume so the app can use it 24/7."
-  ensure_secrets_volume
+  echo "With key-pair (default): you will be prompted for your MFA code once; init-db generates a key pair, registers it with Snowflake, and saves the private key to .env."
+
+  # Use a temporary volume so init.js has a writable path for the key file
+  TEMP_VOL="comunitree_init_tmp_$$"
+  TEMP_KEY_PATH="/tmp_keys/snowflake_rsa_key.p8"
+  docker volume create "$TEMP_VOL" >/dev/null 2>&1 || true
+  docker run --rm -v "${TEMP_VOL}:/tmp_keys" "$IMAGE" sh -c 'mkdir -p /tmp_keys && chmod 777 /tmp_keys' 2>/dev/null || true
+
   set +e
-  docker run -it --rm -v "${KEY_VOLUME}:/secrets" --env-file "$ENV_FILE" -e SNOWFLAKE_PRIVATE_KEY_PATH="$KEY_PATH" "$IMAGE" node server/db/init.js
+  docker run -it --rm \
+    -v "${TEMP_VOL}:/tmp_keys" \
+    --env-file "$ENV_FILE" \
+    -e SNOWFLAKE_PRIVATE_KEY_PATH="$TEMP_KEY_PATH" \
+    "$IMAGE" node server/db/init.js
   INIT_RET=$?
   set -e
+
   if [ "$INIT_RET" -ne 0 ]; then
+    docker volume rm "$TEMP_VOL" >/dev/null 2>&1 || true
     dbg_log "step_failed" "\"step\":4,\"error\":\"init-db exited with code $INIT_RET\""
-    echo "DB init failed (exit code $INIT_RET). Fix .env (Snowflake credentials, key path, or MFA) and run again with --init-db." >&2
+    echo "DB init failed (exit code $INIT_RET). Fix .env (Snowflake credentials or MFA) and run again with --init-db." >&2
     exit 1
   fi
-  fix_key_permissions
-  if verify_key_readable; then
-    echo "DB init completed. Key written and verified."
+
+  # Extract the generated key from the temp volume, inject into .env, then discard the volume
+  KEY_PEM=$(docker run --rm -v "${TEMP_VOL}:/tmp_keys" "$IMAGE" cat "$TEMP_KEY_PATH" 2>/dev/null || true)
+  docker volume rm "$TEMP_VOL" >/dev/null 2>&1 || true
+
+  if [ -n "$KEY_PEM" ]; then
+    inject_key_into_env "$KEY_PEM"
+    echo "DB init completed. Key saved to .env — no Docker volume needed at runtime."
   else
-    echo "DB init completed but key verification failed. The app may not start correctly." >&2
+    echo "DB init completed but could not extract the private key from the container." >&2
+    echo "  If key-pair auth was already set up, the existing SNOWFLAKE_PRIVATE_KEY in .env will be used." >&2
   fi
 fi
 
@@ -260,22 +251,21 @@ debug "Step 7: Running container"
 DETACH="-d"
 [ "$FOREGROUND" = "1" ] && DETACH=""
 
-KEY_ENV=""
+# Pre-flight: if JWT auth is configured, verify that SNOWFLAKE_PRIVATE_KEY is present in .env
 if grep -q 'SNOWFLAKE_AUTHENTICATOR=SNOWFLAKE_JWT' "$ENV_FILE" 2>/dev/null; then
-  KEY_ENV="-v ${KEY_VOLUME}:/secrets -e SNOWFLAKE_PRIVATE_KEY_PATH=${KEY_PATH}"
-  ensure_secrets_volume
-  if ! verify_key_readable; then
-    echo "Error: Cannot start — Snowflake JWT auth is configured but the private key is missing or unreadable." >&2
-    echo "  Run:  ./docker-run.bash --init-db   to generate the key first." >&2
+  if ! grep -q '^SNOWFLAKE_PRIVATE_KEY=.\+' "$ENV_FILE" 2>/dev/null; then
+    echo "Error: Cannot start — SNOWFLAKE_AUTHENTICATOR=SNOWFLAKE_JWT is set but SNOWFLAKE_PRIVATE_KEY is empty or missing in .env." >&2
+    echo "  Run:  ./docker-run.bash --init-db   to generate and save the key first." >&2
     exit 1
   fi
+  debug "SNOWFLAKE_PRIVATE_KEY found in .env — no volume mount needed."
 fi
 echo "Starting Comunitree (frontend $PORT, backend 7000)..."
 if [ "$FOREGROUND" = "1" ]; then
-  exec docker run -p "${PORT}:8000" -p "7000:7000" $KEY_ENV --name "$CONTAINER_NAME" --env-file "$ENV_FILE" --rm $DETACH "$IMAGE"
+  exec docker run -p "${PORT}:8000" -p "7000:7000" --name "$CONTAINER_NAME" --env-file "$ENV_FILE" --rm $DETACH "$IMAGE"
 fi
 
-RUN_ERR=$(docker run $DETACH -p "${PORT}:8000" -p "7000:7000" $KEY_ENV --name "$CONTAINER_NAME" --env-file "$ENV_FILE" --restart unless-stopped "$IMAGE" 2>&1); RUN_RET=$?
+RUN_ERR=$(docker run $DETACH -p "${PORT}:8000" -p "7000:7000" --name "$CONTAINER_NAME" --env-file "$ENV_FILE" --restart unless-stopped "$IMAGE" 2>&1); RUN_RET=$?
 if [ "$RUN_RET" -ne 0 ]; then
   dbg_log "step_failed" "\"step\":7,\"error\":\"$(sanitize_err "$RUN_ERR")\""
   echo "Error: failed to run container" >&2
