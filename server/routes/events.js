@@ -24,6 +24,7 @@ router.post(
     body('description').optional().trim().isLength({ max: 5000 }),
     body('is_public').optional().isBoolean(),
     body('visibility_settings').optional().isObject(),
+    body('link').optional().trim().isLength({ max: 2000 }),
   ],
   async (req, res) => {
     const errors = validationResult(req);
@@ -48,8 +49,12 @@ router.post(
         description: req.body.description,
         is_public: req.body.is_public,
         visibility_settings: req.body.visibility_settings,
+        link: req.body.link,
       };
       const event = await eventService.createEvent(req.user.id, payload);
+      if (req.app.get('io')) {
+        req.app.get('io').emit('event:created', event);
+      }
       return res.status(201).json(event);
     } catch (err) {
       if (err.code === 'NOT_FOUND') {
@@ -124,6 +129,7 @@ router.patch(
     body('is_public').optional().isBoolean(),
     body('visibility_settings').optional().isObject(),
     body('is_active').optional().isBoolean(),
+    body('link').optional().trim().isLength({ max: 2000 }),
   ],
   async (req, res) => {
     const errors = validationResult(req);
@@ -143,6 +149,9 @@ router.patch(
         req.user.id,
         payload
       );
+      if (req.app.get('io')) {
+        req.app.get('io').emit('event:updated', event);
+      }
       return res.json(event);
     } catch (err) {
       if (err.code === 'NOT_FOUND') {
@@ -373,6 +382,100 @@ router.get(
     } catch (err) {
       console.error('Get my rating error:', err);
       return res.status(500).json({ error: 'Failed to get your rating' });
+    }
+  }
+);
+
+/**
+ * POST /events/:id/water — water an event (auth required).
+ */
+router.post(
+  '/:id/water',
+  requireAuth,
+  [param('id').isUUID(4).withMessage('Invalid event id')],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+    try {
+      const result = await eventService.waterEvent(req.params.id, req.user.id);
+      if (req.app.get('io')) {
+        req.app.get('io').emit('event:watered', { eventId: req.params.id, userId: req.user.id });
+      }
+      return res.status(201).json(result);
+    } catch (err) {
+      if (err.code === 'NOT_FOUND') {
+        return res.status(404).json({ error: 'Event not found' });
+      }
+      console.error('Water event error:', err);
+      return res.status(500).json({ error: 'Failed to water event' });
+    }
+  }
+);
+
+/**
+ * DELETE /events/:id/water — unwater an event (auth required).
+ */
+router.delete(
+  '/:id/water',
+  requireAuth,
+  [param('id').isUUID(4).withMessage('Invalid event id')],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+    try {
+      const result = await eventService.unwaterEvent(req.params.id, req.user.id);
+      return res.json(result);
+    } catch (err) {
+      console.error('Unwater event error:', err);
+      return res.status(500).json({ error: 'Failed to unwater event' });
+    }
+  }
+);
+
+/**
+ * GET /events/:id/waters — get water count for an event.
+ */
+router.get(
+  '/:id/waters',
+  optionalAuth,
+  [param('id').isUUID(4).withMessage('Invalid event id')],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+    try {
+      const count = await eventService.getWaterCount(req.params.id);
+      return res.json({ count });
+    } catch (err) {
+      console.error('Get waters error:', err);
+      return res.status(500).json({ error: 'Failed to get water count' });
+    }
+  }
+);
+
+/**
+ * GET /events/:id/my-water — check if current user watered.
+ */
+router.get(
+  '/:id/my-water',
+  requireAuth,
+  [param('id').isUUID(4).withMessage('Invalid event id')],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+    try {
+      const result = await eventService.getMyWater(req.params.id, req.user.id);
+      return res.json(result);
+    } catch (err) {
+      console.error('Get my water error:', err);
+      return res.status(500).json({ error: 'Failed to get water status' });
     }
   }
 );

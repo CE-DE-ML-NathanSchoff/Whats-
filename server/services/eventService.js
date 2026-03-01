@@ -41,6 +41,8 @@ function rowToEvent(row) {
   const is_active = row.IS_ACTIVE ?? row.is_active;
   const created_at = row.CREATED_AT ?? row.created_at;
   const updated_at = row.UPDATED_AT ?? row.updated_at;
+  const waters_count = row.WATERS_COUNT ?? row.waters_count;
+  const link = row.LINK ?? row.link;
   return {
     id,
     community_id,
@@ -56,6 +58,8 @@ function rowToEvent(row) {
     is_active: is_active ?? true,
     created_at,
     updated_at,
+    waters_count: waters_count ?? 0,
+    link: link ?? null,
   };
 }
 
@@ -100,8 +104,8 @@ export async function createEvent(creatorId, payload) {
   const eventId = crypto.randomUUID();
 
   const sql = `
-    INSERT INTO events (id, community_id, creator_id, title, description, event_date, event_time, broad_location, specific_location, is_public, visibility_settings)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, PARSE_JSON(?))
+    INSERT INTO events (id, community_id, creator_id, title, description, event_date, event_time, broad_location, specific_location, is_public, visibility_settings, link)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, PARSE_JSON(?), ?)
   `;
   await execute(sql, [
     eventId,
@@ -115,6 +119,7 @@ export async function createEvent(creatorId, payload) {
     payload.specific_location ?? null,
     is_public,
     visibilityJson ?? 'null',
+    payload.link ?? null,
   ]);
 
   return getEventById(eventId, { viewerId: creatorId });
@@ -331,6 +336,7 @@ export async function updateEvent(eventId, userId, payload) {
     'is_public',
     'visibility_settings',
     'is_active',
+    'link',
   ];
   for (const key of allowed) {
     if (payload[key] === undefined) continue;
@@ -562,4 +568,87 @@ export async function getMyRating(eventId, userId) {
   if (!rows[0]) return { rating: null };
   const r = rows[0].RATING ?? rows[0].rating;
   return { rating: r != null ? Number(r) : null };
+}
+
+// ---------- Watering ----------
+
+export async function waterEvent(eventId, userId) {
+  const event = await getEventById(eventId);
+  if (!event) {
+    const err = new Error('Event not found');
+    err.code = 'NOT_FOUND';
+    throw err;
+  }
+  const existing = await query(
+    'SELECT 1 FROM event_waters WHERE event_id = ? AND user_id = ?',
+    [eventId, userId]
+  );
+  if (existing.length > 0) {
+    return { watered: true, already: true };
+  }
+  await execute(
+    'INSERT INTO event_waters (event_id, user_id) VALUES (?, ?)',
+    [eventId, userId]
+  );
+  await execute(
+    'UPDATE events SET waters_count = COALESCE(waters_count, 0) + 1, updated_at = CURRENT_TIMESTAMP() WHERE id = ?',
+    [eventId]
+  );
+  return { watered: true, already: false };
+}
+
+export async function unwaterEvent(eventId, userId) {
+  const existing = await query(
+    'SELECT 1 FROM event_waters WHERE event_id = ? AND user_id = ?',
+    [eventId, userId]
+  );
+  if (existing.length === 0) {
+    return { watered: false };
+  }
+  await execute(
+    'DELETE FROM event_waters WHERE event_id = ? AND user_id = ?',
+    [eventId, userId]
+  );
+  await execute(
+    'UPDATE events SET waters_count = GREATEST(COALESCE(waters_count, 0) - 1, 0), updated_at = CURRENT_TIMESTAMP() WHERE id = ?',
+    [eventId]
+  );
+  return { watered: false };
+}
+
+export async function getWaterCount(eventId) {
+  const rows = await query(
+    'SELECT COUNT(*) AS cnt FROM event_waters WHERE event_id = ?',
+    [eventId]
+  );
+  return Number(rows[0]?.CNT ?? rows[0]?.cnt ?? 0);
+}
+
+export async function getMyWater(eventId, userId) {
+  const rows = await query(
+    'SELECT 1 FROM event_waters WHERE event_id = ? AND user_id = ?',
+    [eventId, userId]
+  );
+  return { watered: rows.length > 0 };
+}
+
+export async function listEventsWateredByUser(userId, opts = {}) {
+  const { limit = 50, offset = 0 } = opts;
+  const rows = await query(
+    `SELECT e.id, e.community_id, e.creator_id, e.title, e.description, e.event_date, e.event_time, e.broad_location, e.specific_location, e.is_public, e.waters_count, e.is_active, e.created_at, e.updated_at, ew.created_at AS watered_at
+     FROM event_waters ew
+     JOIN events e ON e.id = ew.event_id AND e.is_active = TRUE
+     WHERE ew.user_id = ?
+     ORDER BY ew.created_at DESC
+     LIMIT ? OFFSET ?`,
+    [userId, limit, offset]
+  );
+  return rows.map((row) => {
+    const event = rowToEvent(row);
+    return {
+      ...event,
+      waters_count: Number(row.WATERS_COUNT ?? row.waters_count ?? 0),
+      watered_at: row.WATERED_AT ?? row.watered_at,
+    };
+  });
 }

@@ -1,0 +1,205 @@
+# Roots 🌱 — CLAUDE.md
+
+## Project Overview
+Roots is a hyperlocal community platform. Neighbors discover events on a living animated map where posts appear as seeds and grow into trees as people engage. No DMs. All interaction is public/group-based.
+
+**Hackathon:** HenHacks | **Domain:** roots.community
+
+---
+
+## Stack
+```
+Frontend:  React + Vite + Tailwind CSS + Framer Motion
+Map:       MapLibre GL JS + @vis.gl/react-maplibre
+Tiles:     https://tiles.openfreemap.org/styles/dark  (NO API KEY needed)
+Backend:   Python FastAPI
+Database:  Supabase (PostgreSQL + real-time + auth)
+AI Chat:   Claude API (Anthropic) — chatbot assistant
+AI Labels: Claude API — weekly neighborhood personality
+Moderation:Google Gemini API
+Discord:   Webhook cross-posting
+Deploy:    Vercel (frontend) + Digital Ocean (backend)
+```
+
+---
+
+## Project Structure
+```
+roots/
+├── frontend/
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── Map/          # LiveMap.jsx, seed nodes, ripple animations
+│   │   │   ├── Posts/        # PostCard.jsx, CreatePost.jsx
+│   │   │   ├── Friends/      # FriendButton, FriendsList, FriendRequests
+│   │   │   ├── Profile/      # ProfilePage, ProfileCard
+│   │   │   ├── Business/     # BusinessDashboard, BusinessProfile
+│   │   │   ├── Chatbot/      # ChatBot.jsx (floating Claude-powered assistant)
+│   │   │   ├── Neighborhood/ # SparkCounter, NeighborhoodStats
+│   │   │   ├── Nav/          # BottomNav.jsx
+│   │   │   └── UI/           # Toast.jsx, skeleton loaders
+│   │   ├── pages/            # MapPage, ProfilePage, LoginPage, OnboardingPage
+│   │   ├── hooks/            # useToast, useAuth, usePosts, useFriends
+│   │   ├── context/          # AuthContext.jsx
+│   │   └── lib/
+│   │       ├── supabase.js   # Supabase client
+│   │       └── maplibre.js   # Map config
+├── backend/
+│   ├── routes/               # posts.py, friends.py, neighborhoods.py, chat.py, crosspost.py, business.py
+│   ├── ai/                   # moderation.py (Gemini), personality.py (Claude)
+│   └── main.py
+└── supabase/
+    └── schema.sql
+```
+
+---
+
+## Key Commands
+```bash
+# Frontend
+cd frontend && npm install
+npm run dev          # localhost:5173
+npm run build
+
+# Backend
+cd backend && pip install -r requirements.txt
+uvicorn main:app --reload   # localhost:8000
+
+# Supabase
+supabase start       # local dev
+supabase db push     # apply schema
+```
+
+---
+
+## Environment Variables
+
+**frontend/.env**
+```
+VITE_SUPABASE_URL=
+VITE_SUPABASE_KEY=
+VITE_ANTHROPIC_API_KEY=
+```
+
+**backend/.env**
+```
+SUPABASE_URL=
+SUPABASE_KEY=
+ANTHROPIC_API_KEY=
+GEMINI_API_KEY=
+DISCORD_WEBHOOK_URL=
+```
+
+---
+
+## Database Tables
+| Table | Key Fields |
+|-------|-----------|
+| `users` | id, username, area_id, user_type (guest/local/business), interests[] |
+| `neighborhoods` | id, name, lat, lng, spark_count, personality |
+| `posts` | id, user_id, neighborhood_id, content, event_time, growth_stage, interaction_count |
+| `interactions` | id, post_id, user_id, type (attend/join/respond) |
+| `friendships` | id, requester_id, addressee_id, status (pending/accepted/declined) |
+| `business_profiles` | id, user_id, business_name, business_type, verified |
+| `cross_posts` | id, post_id, platform, status |
+
+---
+
+## Seed Growth Stages
+```
+seed    → 0 interactions   → grey dim dot, 10px
+sprout  → 1-2 interactions → green pulse, 14px
+sapling → 3-5 interactions → green glow, 20px
+tree    → 6-10 interactions→ green node, 28px
+oak     → 10+ recurring    → gold beacon, 36px
+```
+
+---
+
+## Core Rules
+- **MapLibre only** — never use mapbox-gl directly. Use `@vis.gl/react-maplibre`
+- **No DMs** — never build any direct messaging feature
+- **Framer Motion** for all animations — seed growth uses `variants` prop
+- **Supabase real-time** for live interaction counts — use `.channel().on('postgres_changes')`
+- **React functional components only** — no class components
+- **Tailwind only** for styling — no inline styles except for dynamic map marker sizing
+- **TypeScript** is optional at hackathon speed — plain JS is fine
+- Before coding any feature: **propose a plan in bullets, wait for approval**
+- Keep changes **minimal and focused** — no unrequested refactors
+- Run `npm run dev` and check for errors after each feature
+
+---
+
+## API Endpoints
+```
+GET  /api/posts?lat=&lng=&radius=
+POST /api/posts                    → triggers Gemini moderation
+POST /api/posts/:id/interact       → triggers growth stage update
+GET  /api/posts/:id/attendees
+POST /api/friends/request
+POST /api/friends/:id/respond
+GET  /api/users/:id/profile
+GET  /api/neighborhoods/:id/stats
+POST /api/chat                     → proxies to Claude API
+POST /api/posts/:id/crosspost      → sends to Discord
+```
+
+---
+
+## AI Chatbot System Prompt
+When building `/api/chat`, use this system prompt for Claude:
+```
+You are the Roots community assistant. Roots is a hyperlocal neighborhood 
+platform where people discover nearby events, join groups, and connect with 
+neighbors — no direct messaging, all public. Help users find events near them, 
+explain how the platform works, suggest ways to get involved, and answer 
+questions about Roots features. Be warm, friendly, and community-focused. 
+Keep responses concise.
+```
+
+---
+
+## Framer Motion Growth Pattern
+```jsx
+const stageVariants = {
+  seed:    { scale: 0.35, opacity: 0.5,  backgroundColor: '#6B7280' },
+  sprout:  { scale: 0.55, opacity: 0.75, backgroundColor: '#74C69D' },
+  sapling: { scale: 0.75, opacity: 0.88, backgroundColor: '#52B788' },
+  tree:    { scale: 1.0,  opacity: 1.0,  backgroundColor: '#2D6A4F' },
+  oak:     { scale: 1.25, opacity: 1.0,  backgroundColor: '#FFD700' },
+}
+
+<motion.div
+  variants={stageVariants}
+  animate={post.growth_stage}
+  transition={{ type: 'spring', stiffness: 180, damping: 15 }}
+/>
+```
+
+---
+
+## Supabase Real-Time Pattern
+```js
+supabase.channel('posts')
+  .on('postgres_changes', {
+    event: 'UPDATE', schema: 'public', table: 'posts'
+  }, (payload) => {
+    updateSeedOnMap(payload.new)
+  }).subscribe()
+```
+
+---
+
+## Definition of Done (per feature)
+- [ ] Component renders without console errors
+- [ ] Supabase reads/writes work
+- [ ] Framer Motion animation plays correctly
+- [ ] Mobile layout looks good (375px width)
+- [ ] No hardcoded secrets or API keys in code
+
+## Active Skills
+Always read these before coding:
+- .claude/skills/maplibre-seed-node/SKILL.md
+- .claude/skills/supabase-realtime/SKILL.md  
+- .claude/skills/react-component/SKILL.md
+- .claude/skills/fastapi-route/SKILL.md

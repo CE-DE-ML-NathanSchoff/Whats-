@@ -161,6 +161,17 @@ CREATE TABLE IF NOT EXISTS event_ratings (
 );
 `;
 
+const EVENT_WATERS_TABLE = `
+CREATE TABLE IF NOT EXISTS event_waters (
+  event_id VARCHAR(36) NOT NULL,
+  user_id VARCHAR(36) NOT NULL,
+  created_at TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP(),
+  PRIMARY KEY (event_id, user_id),
+  CONSTRAINT fk_water_event FOREIGN KEY (event_id) REFERENCES events(id),
+  CONSTRAINT fk_water_user FOREIGN KEY (user_id) REFERENCES users(id)
+);
+`;
+
 async function init() {
   // If MFA is required and passcode not in .env, prompt so it's set before snowflake config loads
   if (process.env.SNOWFLAKE_AUTHENTICATOR === 'USERNAME_PASSWORD_MFA' && !process.env.SNOWFLAKE_PASSCODE) {
@@ -195,6 +206,12 @@ async function init() {
     console.log('Table event_rsvps created or already exists.');
     await execute(EVENT_RATINGS_TABLE);
     console.log('Table event_ratings created or already exists.');
+    await execute(EVENT_WATERS_TABLE);
+    console.log('Table event_waters created or already exists.');
+    await execute('ALTER TABLE events ADD COLUMN IF NOT EXISTS waters_count INT DEFAULT 0');
+    console.log('Column waters_count added or already exists.');
+    await execute('ALTER TABLE events ADD COLUMN IF NOT EXISTS link VARCHAR(2000)');
+    console.log('Column link added or already exists.');
     console.log('Comunitree DB init done.');
   } catch (err) {
     console.error('Init failed:', err.message);
