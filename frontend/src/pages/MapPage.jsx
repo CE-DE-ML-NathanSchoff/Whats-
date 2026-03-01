@@ -43,7 +43,7 @@ const SEED_POSTS = [
     location: 'Clark Park, Philadelphia',
     lat: 39.9541, lng: -75.1878,
     waters_count: 12, growth_stage: 'oak',
-    is_branch: false, branch_count: 2,
+    is_branch: false, branch_count: 4,
     privacy: 'public',
     author: {
       id: 'u1', username: 'alex_r', initials: 'AR',
@@ -64,7 +64,7 @@ const SEED_POSTS = [
     location: 'Clark Park, Philadelphia',
     lat: 39.9555, lng: -75.1860,
     waters_count: 4, growth_stage: 'sapling',
-    is_branch: true, parent_id: 1, branch_count: 0,
+    is_branch: true, parent_id: 1, branch_count: 1,
     privacy: 'public',
     author: {
       id: 'u2', username: 'chef_maria', initials: 'CM',
@@ -133,7 +133,7 @@ const SEED_POSTS = [
     location: 'Kingsessing Recreation Center Garden',
     lat: 39.9381, lng: -75.1823,
     waters_count: 2, growth_stage: 'sprout',
-    is_branch: false, branch_count: 0,
+    is_branch: false, branch_count: 1,
     privacy: 'public',
     author: {
       id: 'u5', username: 'green_philly', initials: 'GP',
@@ -155,6 +155,7 @@ const SEED_POSTS = [
     location: 'Clark Park Amphitheater',
     lat: 39.9480, lng: -75.1750,
     waters_count: 9, growth_stage: 'tree',
+    fallen: true,
     is_branch: false, branch_count: 1,
     privacy: 'public',
     author: {
@@ -176,6 +177,7 @@ const SEED_POSTS = [
     location: 'University City Community Center',
     lat: 39.9560, lng: -75.1800,
     waters_count: 14, growth_stage: 'oak',
+    decayed: true,
     is_branch: false, branch_count: 3,
     privacy: 'public',
     author: {
@@ -183,6 +185,28 @@ const SEED_POSTS = [
       user_type: 'business', business_name: 'West Philly Community Org',
       community: 'West Philadelphia',
       verified: true, trees: 18, waters: 142, branches: 9,
+      friendship_status: 'none',
+    },
+  },
+
+  // ── Fallen tree — visible on map with floating 🪵 icon ──
+  {
+    id: 9,
+    title: 'Street Mural Painting Day 🎨',
+    content: 'We painted the most beautiful mural on 48th Street. What an amazing turnout!',
+    link: null,
+    event_time: '2026-02-25T11:00:00',
+    timezone: 'America/New_York',
+    location: '48th & Baltimore Ave',
+    lat: 39.9500, lng: -75.1770,
+    waters_count: 11, growth_stage: 'tree',
+    fallen: true,
+    is_branch: false, branch_count: 0,
+    privacy: 'public',
+    author: {
+      id: 'u9', username: 'mural_arts', initials: 'MA',
+      user_type: 'local', community: 'West Philadelphia',
+      verified: false, trees: 3, waters: 19, branches: 1,
       friendship_status: 'none',
     },
   },
@@ -205,6 +229,111 @@ const SEED_POSTS = [
       user_type: 'business', business_name: 'Kingsessing Library',
       community: 'Kingsessing',
       verified: true, trees: 6, waters: 44, branches: 2,
+      friendship_status: 'none',
+    },
+  },
+
+  // ── Branch of Farmers Market (post 1) — vendor signup ──
+  {
+    id: 10,
+    title: 'Vendor Sign-Up Open 🧺',
+    content: 'Want to sell at Clark Park market? Applications for spring season are open now.',
+    link: null,
+    event_time: '2026-03-10T09:00:00',
+    timezone: 'America/New_York',
+    location: 'Clark Park, Philadelphia',
+    lat: 39.9528, lng: -75.1855,
+    waters_count: 6, growth_stage: 'tree',
+    is_branch: true, parent_id: 1, branch_count: 0,
+    privacy: 'public',
+    author: {
+      id: 'u1', username: 'alex_r', initials: 'AR',
+      user_type: 'local', community: 'West Philadelphia',
+      verified: false, trees: 7, waters: 34, branches: 3,
+      friendship_status: 'none',
+    },
+  },
+
+  // ── Branch of Farmers Market (post 1) — kids corner ──
+  {
+    id: 11,
+    title: 'Kids Craft Corner 🎨',
+    content: 'Free face painting and crafts for kids at the market every Saturday!',
+    link: null,
+    event_time: '2026-03-08T10:00:00',
+    timezone: 'America/New_York',
+    location: 'Clark Park, Philadelphia',
+    lat: 39.9552, lng: -75.1905,
+    waters_count: 3, growth_stage: 'sprout',
+    is_branch: true, parent_id: 1, branch_count: 0,
+    privacy: 'public',
+    author: {
+      id: 'u10', username: 'philly_parents', initials: 'PP',
+      user_type: 'local', community: 'West Philadelphia',
+      verified: false, trees: 2, waters: 11, branches: 0,
+      friendship_status: 'none',
+    },
+  },
+
+  // ── Sub-branch of Cooking Demo (post 2) — recipe swap (chain: 1→2→12) ──
+  {
+    id: 12,
+    title: 'Recipe Swap Thread 📝',
+    content: 'Share your favorite seasonal recipes inspired by the cooking demo!',
+    link: null,
+    event_time: '2026-03-09T12:00:00',
+    timezone: 'America/New_York',
+    location: 'Clark Park, Philadelphia',
+    lat: 39.9570, lng: -75.1842,
+    waters_count: 2, growth_stage: 'sprout',
+    is_branch: true, parent_id: 2, branch_count: 0,
+    privacy: 'public',
+    author: {
+      id: 'u11', username: 'foodie_jay', initials: 'FJ',
+      user_type: 'local', community: 'West Philadelphia',
+      verified: false, trees: 1, waters: 5, branches: 0,
+      friendship_status: 'none',
+    },
+  },
+
+  // ── Branch of Neighborhood Watch (post 3) — block party ──
+  {
+    id: 13,
+    title: 'Block Party Planning 🎉',
+    content: 'Spring block party on 52nd St! Help us plan food, music, and activities.',
+    link: null,
+    event_time: '2026-03-20T18:00:00',
+    timezone: 'America/New_York',
+    location: '52nd & Walnut',
+    lat: 39.9640, lng: -75.1735,
+    waters_count: 5, growth_stage: 'sapling',
+    is_branch: true, parent_id: 3, branch_count: 0,
+    privacy: 'private_group',
+    author: {
+      id: 'u3', username: 'block_captain', initials: 'BC',
+      user_type: 'local', community: 'West Philadelphia',
+      verified: false, trees: 4, waters: 22, branches: 2,
+      friendship_status: 'friends',
+    },
+  },
+
+  // ── Branch of Community Garden (post 5) — seed share ──
+  {
+    id: 14,
+    title: 'Spring Seed Share 🌻',
+    content: 'Bring extra seeds, take what you need. Tomato, basil, and sunflower starters available.',
+    link: null,
+    event_time: '2026-03-23T09:00:00',
+    timezone: 'America/New_York',
+    location: 'Kingsessing Recreation Center Garden',
+    lat: 39.9368, lng: -75.1798,
+    waters_count: 1, growth_stage: 'seed',
+    is_branch: true, parent_id: 5, branch_count: 0,
+    privacy: 'public',
+    author: {
+      id: 'u12', username: 'garden_guru', initials: 'GG',
+      user_type: 'local', community: 'Kingsessing',
+      verified: false, trees: 1, waters: 3, branches: 0,
       friendship_status: 'none',
     },
   },
@@ -260,6 +389,7 @@ export default function MapPage() {
   const [posts, setPosts] = useState(SEED_POSTS)
   const [plantOpen, setPlantOpen] = useState(false)
   const [clickCoords, setClickCoords] = useState(null)
+  const [branchParent, setBranchParent] = useState(null)
   const [selectedPost, setSelectedPost] = useState(null)
   const [filters, setFilters] = useState(DEFAULT_FILTERS)
   const [filterOpen, setFilterOpen] = useState(false)
@@ -363,6 +493,7 @@ export default function MapPage() {
       setSelectedPost(nearby[0])
     } else {
       setClickCoords({ lat: tapLat, lng: tapLng })
+      setBranchParent(null)
       setPlantOpen(true)
     }
   }, [selectedPost, displayPosts])
@@ -371,6 +502,21 @@ export default function MapPage() {
     setSelectedPost(post)
     setPlantOpen(false)
     setPickerOpen(false)
+  }, [])
+
+  const handlePlant = useCallback((newPost) => {
+    setPosts((prev) => {
+      let updated = [...prev, newPost]
+      if (newPost.is_branch && newPost.parent_id) {
+        updated = updated.map((p) =>
+          p.id === newPost.parent_id
+            ? { ...p, branch_count: (p.branch_count ?? 0) + 1 }
+            : p
+        )
+      }
+      return updated
+    })
+    setBranchParent(null)
   }, [])
 
   return (
@@ -442,8 +588,10 @@ export default function MapPage() {
       />
       <PlantTree
         open={plantOpen}
-        onClose={() => setPlantOpen(false)}
+        onClose={() => { setPlantOpen(false); setBranchParent(null) }}
         coords={clickCoords}
+        parentPost={branchParent}
+        onPlant={handlePlant}
       />
       <LocationPicker
         open={locationPickerOpen}
@@ -457,6 +605,7 @@ export default function MapPage() {
         onAddBranch={(post) => {
           setSelectedPost(null)
           setClickCoords({ lat: post.lat, lng: post.lng })
+          setBranchParent(post)
           setPlantOpen(true)
         }}
       />

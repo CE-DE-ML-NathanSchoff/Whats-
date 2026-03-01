@@ -1106,6 +1106,23 @@ export default function PostCard({ post, onClose, onAddBranch }) {
                 </div>
               ) : (
                 <>
+                  {/* Branch indicator */}
+                  {post.is_branch && (
+                    <div
+                      className="flex items-center gap-1.5 mb-2 px-2.5 py-1 rounded-full self-start"
+                      style={{
+                        background: 'rgba(82,183,136,0.12)',
+                        border: '1px solid rgba(82,183,136,0.25)',
+                        display: 'inline-flex',
+                      }}
+                    >
+                      <span style={{ fontSize: 12, lineHeight: 1 }}>🌿</span>
+                      <span style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 600, fontSize: 10, color: '#52B788' }}>
+                        Branch
+                      </span>
+                    </div>
+                  )}
+
                   {/* Title */}
                   <h2
                     className="mb-2"
@@ -1116,13 +1133,70 @@ export default function PostCard({ post, onClose, onAddBranch }) {
 
                   {/* Content */}
                   <p
-                    className="mb-4 leading-relaxed"
+                    className="mb-3 leading-relaxed"
                     style={{ fontFamily: "'Roboto', sans-serif", fontWeight: 400, fontSize: 13, color: t.pale }}
                   >
                     {post.privacy === 'private_group' && !isMember
                       ? post.content.slice(0, 60) + '...'
                       : post.content}
                   </p>
+
+                  {/* Event details: time, location, link */}
+                  {(post.event_time || post.location || post.link) && (
+                    <div
+                      className="flex flex-col gap-1.5 mb-4 px-3 py-2.5 rounded-xl"
+                      style={{
+                        background: isDark ? 'rgba(45,106,79,0.1)' : 'rgba(45,106,79,0.06)',
+                        border: `1px solid ${isDark ? 'rgba(82,183,136,0.15)' : 'rgba(45,106,79,0.1)'}`,
+                      }}
+                    >
+                      {post.event_time && (
+                        <div className="flex items-center gap-2">
+                          <span style={{ fontSize: 12, lineHeight: 1, flexShrink: 0 }}>📅</span>
+                          <span style={{ fontFamily: "'Roboto', sans-serif", fontSize: 12, color: t.sprout }}>
+                            {new Date(post.event_time).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                            {' · '}
+                            {new Date(post.event_time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                            {post.timezone && (
+                              <span style={{ color: isDark ? '#6B7280' : '#9CA3AF', marginLeft: 4, fontSize: 10 }}>
+                                {post.timezone.split('/').pop().replace(/_/g, ' ')}
+                              </span>
+                            )}
+                          </span>
+                        </div>
+                      )}
+                      {post.location && (
+                        <div className="flex items-center gap-2">
+                          <span style={{ fontSize: 12, lineHeight: 1, flexShrink: 0 }}>📍</span>
+                          <span style={{ fontFamily: "'Roboto', sans-serif", fontSize: 12, color: t.sprout }}>
+                            {post.location}
+                          </span>
+                        </div>
+                      )}
+                      {post.link && (
+                        <div className="flex items-center gap-2">
+                          <span style={{ fontSize: 12, lineHeight: 1, flexShrink: 0 }}>🔗</span>
+                          <a
+                            href={post.link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            style={{
+                              fontFamily: "'Roboto', sans-serif",
+                              fontSize: 12,
+                              color: '#7DD3F0',
+                              textDecoration: 'none',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {post.link.replace(/^https?:\/\//, '')}
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {/* Progress bar — only for members / public */}
                   {isMember && (

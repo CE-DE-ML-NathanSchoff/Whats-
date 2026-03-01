@@ -168,7 +168,7 @@ function TimezoneSelect({ value, onChange }) {
   )
 }
 
-export default function PlantTree({ open, onClose, coords }) {
+export default function PlantTree({ open, onClose, coords, parentPost, onPlant }) {
   const [name, setName] = useState('')
   const [description, setDesc] = useState('')
   const [link, setLink] = useState('')
@@ -181,6 +181,8 @@ export default function PlantTree({ open, onClose, coords }) {
   const [addressInput, setAddress] = useState('')
   const [confirmCancel, setConfirmCancel] = useState(false)
 
+  const isBranch = !!parentPost
+
   function handleSubmit(e) {
     e.preventDefault()
     if (!name.trim()) {
@@ -190,19 +192,45 @@ export default function PlantTree({ open, onClose, coords }) {
       return
     }
 
-    const data = {
-      name: name.trim(),
-      description: description.trim() || null,
+    const lat = useAddress ? (coords?.lat ?? 39.9526) : coords?.lat
+    const lng = useAddress ? (coords?.lng ?? -75.1652) : coords?.lng
+
+    const newPost = {
+      id: Date.now(),
+      title: name.trim(),
+      content: description.trim() || '',
       link: link.trim() || null,
-      datetime: datetime || null,
+      event_time: datetime || null,
       timezone: datetime ? timezone : null,
       location: useAddress ? (addressInput.trim() || null) : null,
-      lat: useAddress ? null : coords?.lat,
-      lng: useAddress ? null : coords?.lng,
+      lat: isBranch ? parentPost.lat + (Math.random() - 0.5) * 0.003 : lat,
+      lng: isBranch ? parentPost.lng + (Math.random() - 0.5) * 0.003 : lng,
+      waters_count: 0,
+      growth_stage: 'seed',
+      is_branch: isBranch,
+      parent_id: isBranch ? parentPost.id : undefined,
+      branch_count: 0,
+      privacy: selectedPrivacy,
+      author: {
+        id: 'me', username: 'you', initials: 'YO',
+        user_type: 'local', community: 'West Philadelphia',
+        verified: false, trees: 1, waters: 0, branches: 0,
+        friendship_status: 'none',
+      },
     }
-    console.log('Plant tree:', { ...data, privacy: selectedPrivacy })
 
-    // Reset + close sheet
+    onPlant?.(newPost)
+
+    resetForm()
+    onClose()
+
+    const opt = PRIVACY_OPTIONS.find(o => o.id === selectedPrivacy)
+    setToastMsg(isBranch ? '🌿 Branch planted!' : opt.toast)
+    setToast(true)
+    setTimeout(() => setToast(false), 3000)
+  }
+
+  function resetForm() {
     setName('')
     setDesc('')
     setLink('')
@@ -212,13 +240,6 @@ export default function PlantTree({ open, onClose, coords }) {
     setUseAddress(false)
     setPrivacy('public')
     setConfirmCancel(false)
-    onClose()
-
-    // Show toast
-    const opt = PRIVACY_OPTIONS.find(o => o.id === selectedPrivacy)
-    setToastMsg(opt.toast)
-    setToast(true)
-    setTimeout(() => setToast(false), 3000)
   }
 
   function handleCancel() {
@@ -231,15 +252,7 @@ export default function PlantTree({ open, onClose, coords }) {
   }
 
   function doClose() {
-    setName('')
-    setDesc('')
-    setLink('')
-    setDatetime('')
-    setTimezone('')
-    setAddress('')
-    setUseAddress(false)
-    setPrivacy('public')
-    setConfirmCancel(false)
+    resetForm()
     onClose()
   }
 
@@ -292,7 +305,7 @@ export default function PlantTree({ open, onClose, coords }) {
                     fontSize: 18,
                   }}
                 >
-                  Plant a tree here 🌰
+                  {isBranch ? `Branch off: ${parentPost.title} 🌿` : 'Plant a tree here 🌰'}
                 </h2>
 
                 {/* Location toggle */}
@@ -457,7 +470,7 @@ export default function PlantTree({ open, onClose, coords }) {
                     }}
                     whileTap={{ scale: 0.97 }}
                   >
-                    Plant It 🌱
+                    {isBranch ? 'Plant Branch 🌿' : 'Plant It 🌱'}
                   </motion.button>
                 </form>
 
