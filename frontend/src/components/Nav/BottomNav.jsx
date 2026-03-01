@@ -1,11 +1,12 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion'
 
-// ─── Tabs ─────────────────────────────────────────────────────────────────────
+// ─── Tab config ───────────────────────────────────────────────────────────────
 
-const tabs = [
-  { path: '/map',     label: 'Map',      icon: '🗺️' },
+const TABS = [
   { path: '/friends', label: 'Friends',  icon: '👥' },
+  { path: '/explore', label: 'Explore',  icon: '🔍' },
+  { path: '/map',     label: 'Map',      icon: '🗺️', isMap: true },
   { path: '/trees',   label: 'My Trees', icon: '🌳' },
   { path: '/profile', label: 'Profile',  icon: '👤' },
 ]
@@ -19,16 +20,42 @@ export default function BottomNav() {
 
   return (
     <div
-      className="absolute bottom-0 left-0 right-0 z-30 flex items-center"
+      className="absolute bottom-0 left-0 right-0 z-30 flex items-end"
       style={{
-        height: 64,
+        height:     64,
         background: '#0a1a0f',
-        borderTop: '1px solid rgba(82,183,136,0.12)',
+        borderTop:  '1px solid rgba(82,183,136,0.12)',
+        overflow:   'visible',
       }}
     >
-      {tabs.map((tab) => {
+      {TABS.map((tab) => {
         const active = isActive(tab.path)
 
+        // ── Map FAB ───────────────────────────────────────────────────────────
+        if (tab.isMap) {
+          return (
+            <div key={tab.path} className="flex-1 flex justify-center">
+              <motion.button
+                className="flex items-center justify-center border-none cursor-pointer"
+                style={{
+                  width:        56,
+                  height:       56,
+                  background:   'linear-gradient(135deg, #2D6A4F, #52B788)',
+                  borderRadius: 14,
+                  position:     'relative',
+                  top:          -16,
+                  boxShadow:    '0 4px 16px rgba(45,106,79,0.5)',
+                }}
+                whileTap={{ scale: 0.9 }}
+                onClick={() => navigate(tab.path)}
+              >
+                <span style={{ fontSize: 22, color: '#fff' }}>{tab.icon}</span>
+              </motion.button>
+            </div>
+          )
+        }
+
+        // ── Standard tab ─────────────────────────────────────────────────────
         return (
           <motion.button
             key={tab.path}
@@ -42,8 +69,8 @@ export default function BottomNav() {
               style={{
                 fontFamily: "'Roboto', sans-serif",
                 fontWeight: 400,
-                fontSize: 9,
-                color: active ? '#52B788' : '#3a5a45',
+                fontSize:   9,
+                color:      active ? '#52B788' : '#3a5a45',
               }}
             >
               {tab.label}
@@ -51,10 +78,7 @@ export default function BottomNav() {
 
             {/* Active dot */}
             {active ? (
-              <div
-                className="rounded-full"
-                style={{ width: 3, height: 3, background: '#52B788' }}
-              />
+              <div className="rounded-full" style={{ width: 3, height: 3, background: '#52B788' }} />
             ) : (
               <div style={{ width: 3, height: 3 }} />
             )}

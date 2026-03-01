@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import BottomNav from '../components/Nav/BottomNav'
+import SkeletonCard from '../components/UI/SkeletonCard'
 
 // ─── Stage data ───────────────────────────────────────────────────────────────
 
@@ -16,20 +17,44 @@ const stageEmoji = {
 
 const MY_PLANTED = [
   {
-    id: 1, title: 'Saturday Farmers Market 🌽',
+    id: 1,
+    title: 'Saturday Farmers Market 🌽',
     content: 'Fresh local produce every Saturday morning at Clark Park. Bring your own bags!',
-    waters_count: 12, growth_stage: 'oak', branch_count: 2, event_time: 'Sat 9am', is_branch: false,
+    privacy: 'public',
+    waters_count: 12, growth_stage: 'oak',
+    branch_count: 2, event_time: 'Sat 9am',
   },
   {
-    id: 2, title: 'Community Garden 🌿',
-    content: 'New raised beds available for the season. Sign up at the rec center.',
-    waters_count: 4, growth_stage: 'sapling', branch_count: 0, event_time: 'Fri 10am', is_branch: false,
+    id: 2,
+    title: 'Secret Rooftop Dinner 🌙',
+    content: 'A private dinner for close friends. Bring something to share!',
+    privacy: 'invite_only',
+    waters_count: 3, growth_stage: 'sapling',
+    branch_count: 0, event_time: 'Sat 7pm',
+    members: [
+      { id: 1, username: 'alex_r',   initials: 'AR', role: 'creator', status: 'accepted' },
+      { id: 2, username: 'maya_w',   initials: 'MW', role: 'member',  status: 'accepted' },
+      { id: 3, username: 'jordan_k', initials: 'JK', role: 'member',  status: 'pending'  },
+    ],
+  },
+  {
+    id: 3,
+    title: 'Neighborhood Watch 🔒',
+    content: 'Monthly meeting to discuss neighborhood safety and updates.',
+    privacy: 'private_group',
+    waters_count: 6, growth_stage: 'tree',
+    branch_count: 1, event_time: 'Thu 7pm',
+    members: [
+      { id: 1, username: 'alex_r',  initials: 'AR', role: 'creator', status: 'accepted' },
+      { id: 4, username: 'priya_s', initials: 'PS', role: 'member',  status: 'pending'  },
+    ],
   },
 ]
 
 const MY_WATERED = [
   {
-    id: 3, title: 'Block Party Planning 🎉',
+    id: 5,
+    title: 'Block Party Planning 🎉',
     content: 'Annual block party coming up — help plan activities, food, and music for the whole block.',
     waters_count: 7, growth_stage: 'tree', branch_count: 1, event_time: 'Sun 3pm', is_branch: false,
   },
@@ -37,7 +62,8 @@ const MY_WATERED = [
 
 const MY_BRANCHES = [
   {
-    id: 4, title: 'Cooking Demo 2pm',
+    id: 6,
+    title: 'Cooking Demo 2pm',
     content: 'Learn to cook seasonal produce fresh from the market. All skill levels welcome.',
     waters_count: 2, growth_stage: 'sprout', branch_count: 0, event_time: 'Sat 11am',
     is_branch: true, parent_title: 'Saturday Farmers Market 🌽',
@@ -51,6 +77,414 @@ const TABS = [
   { id: 'watered',  label: '💧 Watered' },
   { id: 'branches', label: '🌿 Branches' },
 ]
+
+// ─── MemberSheet ──────────────────────────────────────────────────────────────
+
+function MemberSheet({ tree, onClose }) {
+  const [memberTab,        setMemberTab]        = useState('accepted')
+  const [members,          setMembers]          = useState(tree?.members ?? [])
+  const [showInviteInput,  setShowInviteInput]  = useState(false)
+  const [inviteInput,      setInviteInput]      = useState('')
+  const [toast,            setToast]            = useState(null)
+
+  // Reset when tree changes
+  useEffect(() => {
+    if (!tree) return
+    setMemberTab('accepted')
+    setMembers(tree.members ?? [])
+    setShowInviteInput(false)
+    setInviteInput('')
+    setToast(null)
+  }, [tree?.id])
+
+  function showToast(msg) {
+    setToast(msg)
+    setTimeout(() => setToast(null), 2500)
+  }
+
+  function handleRemove(memberId) {
+    setMembers((prev) => prev.filter((m) => m.id !== memberId))
+    showToast('Member removed')
+  }
+
+  function handleAccept(memberId) {
+    setMembers((prev) =>
+      prev.map((m) => m.id === memberId ? { ...m, status: 'accepted' } : m)
+    )
+    showToast('✅ Request accepted!')
+  }
+
+  function handleDecline(memberId) {
+    setMembers((prev) => prev.filter((m) => m.id !== memberId))
+    showToast('Request declined')
+  }
+
+  function handleSendInvite() {
+    if (!inviteInput.trim()) return
+    showToast('🫂 Invite sent!')
+    setInviteInput('')
+    setShowInviteInput(false)
+  }
+
+  const accepted = members.filter((m) => m.status === 'accepted')
+  const pending  = members.filter((m) => m.status === 'pending')
+
+  const inputClass =
+    'w-full rounded-[10px] px-4 py-3 text-white text-sm bg-white/5 border border-white/10 outline-none placeholder-white/30 focus:border-[#52B788] transition-colors'
+
+  return (
+    <AnimatePresence>
+      {tree && (
+        <>
+          {/* Backdrop */}
+          <motion.div
+            className="absolute inset-0 z-40"
+            style={{ background: 'rgba(0,0,0,0.45)' }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+          />
+
+          {/* Sheet */}
+          <motion.div
+            className="absolute left-0 right-0 bottom-0 z-50 flex flex-col"
+            style={{
+              background: '#0D1F16',
+              borderTop: '2px solid #2D6A4F',
+              borderRadius: '20px 20px 0 0',
+              padding: 20,
+              maxHeight: '80%',
+            }}
+            initial={{ y: '100%' }}
+            animate={{ y: 0 }}
+            exit={{ y: '100%' }}
+            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+          >
+            {/* Handle */}
+            <div className="w-10 h-1 rounded-full mx-auto mb-4 bg-white/20 flex-shrink-0" />
+
+            {/* Toast inside sheet */}
+            <AnimatePresence>
+              {toast && (
+                <motion.div
+                  className="absolute left-1/2 -translate-x-1/2 z-10 rounded-full px-4 py-2 whitespace-nowrap"
+                  style={{
+                    top: 56,
+                    background: '#2D6A4F',
+                    fontFamily: "'Poppins', sans-serif",
+                    fontSize: 12,
+                    color: '#fff',
+                  }}
+                  initial={{ opacity: 0, y: -8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  {toast}
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Header */}
+            <div className="flex-shrink-0 mb-1">
+              <p style={{
+                fontFamily: "'Poppins', sans-serif",
+                fontWeight: 700,
+                fontSize: 16,
+                color: '#fff',
+              }}>
+                👥 Members
+              </p>
+              <p style={{
+                fontFamily: "'Roboto', sans-serif",
+                fontSize: 12,
+                color: '#74C69D',
+                marginTop: 2,
+              }}>
+                {tree.title}
+              </p>
+            </div>
+
+            {/* X close */}
+            <button
+              onClick={onClose}
+              className="absolute top-8 right-5 text-white/40 text-xl bg-transparent border-none cursor-pointer leading-none"
+              aria-label="Close"
+            >
+              ✕
+            </button>
+
+            {/* Tabs */}
+            <div
+              className="flex-shrink-0 flex gap-6 mt-4 mb-1"
+              style={{ borderBottom: '1px solid rgba(82,183,136,0.1)' }}
+            >
+              {['accepted', 'pending'].map((t) => {
+                const active = memberTab === t
+                const label  = t === 'accepted'
+                  ? `Accepted (${accepted.length})`
+                  : `Pending (${pending.length})`
+                return (
+                  <button
+                    key={t}
+                    onClick={() => setMemberTab(t)}
+                    className="relative pb-3 bg-transparent border-none cursor-pointer capitalize"
+                    style={{
+                      fontFamily: "'Poppins', sans-serif",
+                      fontWeight: active ? 600 : 400,
+                      fontSize: 13,
+                      color: active ? '#fff' : '#3a5a45',
+                    }}
+                  >
+                    {label}
+                    {active && (
+                      <motion.div
+                        layoutId="member-tab-underline"
+                        className="absolute bottom-0 left-0 right-0 rounded-full"
+                        style={{ height: 2, background: '#52B788' }}
+                        transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                      />
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* Member list */}
+            <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: 'none' }}>
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={memberTab}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.18 }}
+                >
+                  {memberTab === 'accepted' && accepted.map((m) => (
+                    <div
+                      key={m.id}
+                      className="flex items-center"
+                      style={{
+                        padding: '10px 0',
+                        borderBottom: '1px solid rgba(82,183,136,0.08)',
+                      }}
+                    >
+                      {/* Avatar */}
+                      <div
+                        className="flex items-center justify-center flex-shrink-0"
+                        style={{
+                          width: 36, height: 36,
+                          borderRadius: '50%',
+                          background: '#2D6A4F',
+                          fontFamily: "'Poppins', sans-serif",
+                          fontWeight: 600,
+                          fontSize: 13,
+                          color: '#fff',
+                        }}
+                      >
+                        {m.initials}
+                      </div>
+
+                      {/* Username */}
+                      <p style={{
+                        fontFamily: "'Poppins', sans-serif",
+                        fontWeight: 500,
+                        fontSize: 13,
+                        color: '#fff',
+                        marginLeft: 10,
+                        flex: 1,
+                      }}>
+                        {m.username}
+                      </p>
+
+                      {/* Creator badge */}
+                      {m.role === 'creator' && (
+                        <span style={{
+                          background: 'rgba(255,215,0,0.1)',
+                          color: '#FFD700',
+                          fontFamily: "'Poppins', sans-serif",
+                          fontWeight: 600,
+                          fontSize: 10,
+                          borderRadius: 20,
+                          padding: '2px 8px',
+                          marginRight: 8,
+                        }}>
+                          👑 Creator
+                        </span>
+                      )}
+
+                      {/* Remove button */}
+                      {m.role !== 'creator' && (
+                        <button
+                          onClick={() => handleRemove(m.id)}
+                          className="bg-transparent border-none cursor-pointer"
+                          style={{
+                            color: '#FF4444',
+                            fontFamily: "'Poppins', sans-serif",
+                            fontWeight: 600,
+                            fontSize: 14,
+                            lineHeight: 1,
+                            padding: '4px 6px',
+                          }}
+                        >
+                          ×
+                        </button>
+                      )}
+                    </div>
+                  ))}
+
+                  {memberTab === 'pending' && pending.length === 0 && (
+                    <p
+                      className="text-center py-8"
+                      style={{
+                        fontFamily: "'Roboto', sans-serif",
+                        fontSize: 13,
+                        color: '#74C69D',
+                      }}
+                    >
+                      No pending requests
+                    </p>
+                  )}
+
+                  {memberTab === 'pending' && pending.map((m) => (
+                    <div
+                      key={m.id}
+                      className="flex items-center"
+                      style={{
+                        padding: '10px 0',
+                        borderBottom: '1px solid rgba(82,183,136,0.08)',
+                      }}
+                    >
+                      {/* Avatar */}
+                      <div
+                        className="flex items-center justify-center flex-shrink-0"
+                        style={{
+                          width: 36, height: 36,
+                          borderRadius: '50%',
+                          background: '#2D6A4F',
+                          fontFamily: "'Poppins', sans-serif",
+                          fontWeight: 600,
+                          fontSize: 13,
+                          color: '#fff',
+                        }}
+                      >
+                        {m.initials}
+                      </div>
+
+                      {/* Username */}
+                      <p style={{
+                        fontFamily: "'Poppins', sans-serif",
+                        fontWeight: 500,
+                        fontSize: 13,
+                        color: '#fff',
+                        marginLeft: 10,
+                        flex: 1,
+                      }}>
+                        {m.username}
+                      </p>
+
+                      {/* Accept */}
+                      <button
+                        onClick={() => handleAccept(m.id)}
+                        className="border-none cursor-pointer"
+                        style={{
+                          background: '#52B788',
+                          color: '#fff',
+                          borderRadius: 8,
+                          padding: '4px 10px',
+                          fontFamily: "'Poppins', sans-serif",
+                          fontWeight: 600,
+                          fontSize: 11,
+                          marginRight: 6,
+                        }}
+                      >
+                        ✓ Accept
+                      </button>
+
+                      {/* Decline */}
+                      <button
+                        onClick={() => handleDecline(m.id)}
+                        className="bg-transparent cursor-pointer"
+                        style={{
+                          border: '1px solid #FF4444',
+                          color: '#FF4444',
+                          borderRadius: 8,
+                          padding: '4px 10px',
+                          fontFamily: "'Poppins', sans-serif",
+                          fontWeight: 600,
+                          fontSize: 11,
+                        }}
+                      >
+                        ✗ Decline
+                      </button>
+                    </div>
+                  ))}
+                </motion.div>
+              </AnimatePresence>
+            </div>
+
+            {/* Invite button — invite_only only */}
+            {tree.privacy === 'invite_only' && (
+              <div className="flex-shrink-0 mt-3">
+                <motion.button
+                  className="w-full border-none cursor-pointer"
+                  style={{
+                    background: '#2D6A4F',
+                    borderRadius: 12,
+                    padding: 12,
+                    fontFamily: "'Poppins', sans-serif",
+                    fontWeight: 700,
+                    fontSize: 14,
+                    color: '#fff',
+                  }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => setShowInviteInput((v) => !v)}
+                >
+                  + Invite Someone 🫂
+                </motion.button>
+
+                <AnimatePresence>
+                  {showInviteInput && (
+                    <motion.div
+                      className="flex flex-col gap-2 mt-3"
+                      initial={{ opacity: 0, y: -8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -8 }}
+                      transition={{ duration: 0.18 }}
+                    >
+                      <input
+                        className={inputClass}
+                        placeholder="Username or email..."
+                        value={inviteInput}
+                        onChange={(e) => setInviteInput(e.target.value)}
+                      />
+                      <motion.button
+                        className="w-full py-2 border-none cursor-pointer"
+                        style={{
+                          background: '#52B788',
+                          borderRadius: 10,
+                          fontFamily: "'Poppins', sans-serif",
+                          fontWeight: 600,
+                          fontSize: 13,
+                          color: '#fff',
+                        }}
+                        whileTap={{ scale: 0.97 }}
+                        onClick={handleSendInvite}
+                      >
+                        + Send Invite
+                      </motion.button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            )}
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  )
+}
 
 // ─── EditTreeSheet ────────────────────────────────────────────────────────────
 
@@ -192,9 +626,12 @@ function ProgressBar({ flowers, stage }) {
 
 // ─── TreeCard ─────────────────────────────────────────────────────────────────
 
-function TreeCard({ post, index, tab, onEdit }) {
+function TreeCard({ post, index, tab, onEdit, onManageMembers }) {
   const color = stageColor[post.growth_stage] ?? '#6B7280'
   const emoji = stageEmoji[post.growth_stage] ?? '🌰'
+  const showManage =
+    tab === 'planted' &&
+    (post.privacy === 'private_group' || post.privacy === 'invite_only')
 
   return (
     <motion.div
@@ -221,8 +658,8 @@ function TreeCard({ post, index, tab, onEdit }) {
         </button>
       )}
 
-      {/* Top row: stage badge + time */}
-      <div className="flex items-center gap-2 mb-2">
+      {/* Top row: stage badge + privacy pill + time */}
+      <div className="flex items-center gap-2 mb-2 flex-wrap">
         <span
           className="rounded-full capitalize"
           style={{
@@ -236,6 +673,37 @@ function TreeCard({ post, index, tab, onEdit }) {
         >
           {emoji} {post.growth_stage}
         </span>
+
+        {/* Privacy pill */}
+        {post.privacy === 'private_group' && (
+          <span style={{
+            background: 'rgba(125,211,240,0.12)',
+            border: '1px solid rgba(125,211,240,0.25)',
+            color: '#7DD3F0',
+            borderRadius: 20,
+            fontFamily: "'Poppins', sans-serif",
+            fontWeight: 600,
+            fontSize: 10,
+            padding: '3px 10px',
+          }}>
+            🔒 Private
+          </span>
+        )}
+        {post.privacy === 'invite_only' && (
+          <span style={{
+            background: 'rgba(255,215,0,0.1)',
+            border: '1px solid rgba(255,215,0,0.25)',
+            color: '#FFD700',
+            borderRadius: 20,
+            fontFamily: "'Poppins', sans-serif",
+            fontWeight: 600,
+            fontSize: 10,
+            padding: '3px 10px',
+          }}>
+            🫂 Invite Only
+          </span>
+        )}
+
         {/* Watered badge */}
         {tab === 'watered' && (
           <span
@@ -251,6 +719,7 @@ function TreeCard({ post, index, tab, onEdit }) {
             💧 Watered
           </span>
         )}
+
         <span
           className="ml-auto"
           style={{ color: '#74C69D', fontSize: 11, fontFamily: "'Roboto', sans-serif" }}
@@ -306,6 +775,25 @@ function TreeCard({ post, index, tab, onEdit }) {
           🌿 {post.branch_count} branches
         </span>
       </div>
+
+      {/* Manage Members button */}
+      {showManage && (
+        <button
+          onClick={() => onManageMembers(post)}
+          className="mt-3 border-none cursor-pointer"
+          style={{
+            background: 'rgba(45,106,79,0.3)',
+            color: '#95D5B2',
+            borderRadius: 10,
+            padding: '6px 12px',
+            fontFamily: "'Poppins', sans-serif",
+            fontWeight: 600,
+            fontSize: 11,
+          }}
+        >
+          👥 Manage Members
+        </button>
+      )}
     </motion.div>
   )
 }
@@ -339,8 +827,15 @@ const TAB_DATA = { planted: MY_PLANTED, watered: MY_WATERED, branches: MY_BRANCH
 
 export default function MyTreesPage() {
   const navigate = useNavigate()
-  const [activeTab, setActiveTab] = useState('planted')
-  const [editTree, setEditTree]   = useState(null)
+  const [activeTab,    setActiveTab]    = useState('planted')
+  const [editTree,     setEditTree]     = useState(null)
+  const [memberSheet,  setMemberSheet]  = useState(null)
+  const [loading,      setLoading]      = useState(true)
+
+  useEffect(() => {
+    const t = setTimeout(() => setLoading(false), 1200)
+    return () => clearTimeout(t)
+  }, [])
 
   const posts = TAB_DATA[activeTab]
 
@@ -428,13 +923,22 @@ export default function MyTreesPage() {
         style={{ paddingBottom: 80, scrollbarWidth: 'none' }}
       >
         <AnimatePresence mode="wait">
-          {posts.length > 0 ? (
+          {loading ? (
+            <motion.div
+              key="skeleton"
+              initial={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <SkeletonCard count={3} />
+            </motion.div>
+          ) : posts.length > 0 ? (
             <motion.div
               key={activeTab}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.15 }}
+              transition={{ duration: 0.3 }}
             >
               {posts.map((post, i) => (
                 <TreeCard
@@ -443,6 +947,7 @@ export default function MyTreesPage() {
                   index={i}
                   tab={activeTab}
                   onEdit={setEditTree}
+                  onManageMembers={setMemberSheet}
                 />
               ))}
             </motion.div>
@@ -454,8 +959,9 @@ export default function MyTreesPage() {
         </AnimatePresence>
       </div>
 
-      {/* ── EditTreeSheet ── */}
-      <EditTreeSheet tree={editTree} onClose={() => setEditTree(null)} />
+      {/* ── Sheets ── */}
+      <EditTreeSheet  tree={editTree}    onClose={() => setEditTree(null)}    />
+      <MemberSheet    tree={memberSheet} onClose={() => setMemberSheet(null)} />
 
       {/* ── Bottom Nav ── */}
       <BottomNav />

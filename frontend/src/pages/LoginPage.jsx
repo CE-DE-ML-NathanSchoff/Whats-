@@ -1,4 +1,6 @@
-import { useState } from 'react'
+import { useState, useContext } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { AuthContext } from '../App'
 
 const roboto = { fontFamily: "'Roboto', sans-serif" }
 const poppins = { fontFamily: "'Poppins', sans-serif" }
@@ -51,8 +53,32 @@ function EyeToggle({ show, onToggle }) {
   )
 }
 
-export default function LoginPage({ onLogin, onRegister }) {
+export default function LoginPage() {
   const [showPw, setShowPw] = useState(false)
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [errorMsg, setErrorMsg] = useState('')
+  const navigate = useNavigate()
+
+  const { setSession } = useContext(AuthContext)
+
+  const handleLogin = async () => {
+    if (!email || !password) {
+      setErrorMsg('Please enter both email and password.')
+      return
+    }
+    setLoading(true)
+    setErrorMsg('')
+
+    // Mocking an authentication delay
+    setTimeout(() => {
+      setLoading(false)
+      // Any email/password will pass for testing purposes
+      setSession({ user: { email } })
+      navigate('/map')
+    }, 1000)
+  }
 
   return (
     <div className="relative w-[360px] h-[640px] overflow-hidden" style={{ background: '#0D1F16' }}>
@@ -79,14 +105,27 @@ export default function LoginPage({ onLogin, onRegister }) {
           Login
         </h2>
 
+        {errorMsg && (
+          <p className="absolute left-10 top-[60px] w-[280px] text-red-500 text-xs text-center">
+            {errorMsg}
+          </p>
+        )}
+
         {/* User Name label */}
         <label className="absolute left-10 top-[79px] text-[14px] leading-[22px] text-[#28332D]" style={roboto}>
-          User Name
+          Email Address
         </label>
 
         {/* Username input */}
         <div className="absolute left-10 top-[103px] w-[280px] h-[42px]">
-          <input type="text" placeholder="Email / Phone Number" className={baseInput} style={inputStyle} />
+          <input
+            type="text"
+            placeholder="Email"
+            className={baseInput}
+            style={inputStyle}
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
         </div>
 
         {/* Password label + Forgot Password */}
@@ -107,17 +146,20 @@ export default function LoginPage({ onLogin, onRegister }) {
             placeholder="Enter Password"
             className={`${baseInput} pr-10`}
             style={inputStyle}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
           />
           <EyeToggle show={showPw} onToggle={() => setShowPw(v => !v)} />
         </div>
 
         {/* LOGIN NOW */}
         <button
-          className="absolute left-10 top-[256px] w-[280px] h-[46px] rounded-[5px] border-none text-white text-[17px] font-medium cursor-pointer"
+          className="absolute left-10 top-[256px] w-[280px] h-[46px] rounded-[5px] border-none text-white text-[17px] font-medium cursor-pointer flex items-center justify-center disabled:opacity-70"
           style={{ background: '#1BBC65', ...roboto }}
-          onClick={onLogin}
+          onClick={handleLogin}
+          disabled={loading}
         >
-          LOGIN NOW
+          {loading ? 'LOGGING IN...' : 'LOGIN NOW'}
         </button>
 
         {/* Divider */}
@@ -145,13 +187,13 @@ export default function LoginPage({ onLogin, onRegister }) {
 
         {/* Don't have an account */}
         <p
-          className="absolute text-center text-[14px] leading-[28px] text-[#28332D]"
-          style={{ left: 102, top: 469, width: 166, ...roboto }}
+          className="absolute w-full text-center text-[14px] leading-[28px] text-[#28332D]"
+          style={{ top: 469, ...roboto }}
         >
           Don't have an account?{' '}
           <button
             className="text-[#1BBC65] font-medium p-0 bg-transparent border-none cursor-pointer"
-            onClick={onRegister}
+            onClick={() => navigate('/register')}
           >
             Create New Account
           </button>

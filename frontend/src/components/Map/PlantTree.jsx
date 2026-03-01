@@ -1,9 +1,44 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 
+// ─── Privacy options ───────────────────────────────────────────────────────────
+
+const PRIVACY_OPTIONS = [
+  {
+    id: 'public',
+    icon: '🌍',
+    title: 'Public',
+    subtitle: 'Anyone can discover and water your tree',
+    borderSelected: '#52B788',
+    bgSelected: 'rgba(82,183,136,0.1)',
+    dotColor: '#52B788',
+    toast: '🌰 Seed planted! 🌍',
+  },
+  {
+    id: 'private_group',
+    icon: '🔒',
+    title: 'Private Group',
+    subtitle: 'Visible on map, people request to join',
+    borderSelected: '#7DD3F0',
+    bgSelected: 'rgba(125,211,240,0.1)',
+    dotColor: '#7DD3F0',
+    toast: '🔒 Private tree planted!',
+  },
+  {
+    id: 'invite_only',
+    icon: '🫂',
+    title: 'Invite Only',
+    subtitle: 'Hidden from map — only invited people see this',
+    borderSelected: '#FFD700',
+    bgSelected: 'rgba(255,215,0,0.08)',
+    dotColor: '#FFD700',
+    toast: '🫂 Invite-only tree planted!',
+  },
+]
+
 // ─── Toast ────────────────────────────────────────────────────────────────────
 
-function Toast({ visible }) {
+function Toast({ visible, message }) {
   return (
     <AnimatePresence>
       {visible && (
@@ -15,7 +50,7 @@ function Toast({ visible }) {
           exit={{ opacity: 0, y: 12 }}
           transition={{ duration: 0.25 }}
         >
-          Your seed is planted! 🌰
+          {message}
         </motion.div>
       )}
     </AnimatePresence>
@@ -30,6 +65,8 @@ export default function PlantTree({ open, onClose, coords }) {
   const [link, setLink]          = useState('')
   const [datetime, setDatetime]  = useState('')
   const [toast, setToast]        = useState(false)
+  const [toastMsg, setToastMsg]  = useState('')
+  const [selectedPrivacy, setPrivacy] = useState('public')
   const [useAddress, setUseAddress] = useState(false)
   const [addressInput, setAddress]  = useState('')
 
@@ -46,7 +83,7 @@ export default function PlantTree({ open, onClose, coords }) {
       lat: useAddress ? null : coords?.lat,
       lng: useAddress ? null : coords?.lng,
     }
-    console.log('Plant tree:', data)
+    console.log('Plant tree:', { ...data, privacy: selectedPrivacy })
 
     // Reset + close sheet
     setName('')
@@ -56,6 +93,8 @@ export default function PlantTree({ open, onClose, coords }) {
     onClose()
 
     // Show toast
+    const opt = PRIVACY_OPTIONS.find(o => o.id === selectedPrivacy)
+    setToastMsg(opt.toast)
     setToast(true)
     setTimeout(() => setToast(false), 3000)
   }
@@ -67,6 +106,7 @@ export default function PlantTree({ open, onClose, coords }) {
     setDatetime('')
     setAddress('')
     setUseAddress(false)
+    setPrivacy('public')
     onClose()
   }
 
@@ -75,7 +115,7 @@ export default function PlantTree({ open, onClose, coords }) {
 
   return (
     <>
-      <Toast visible={toast} />
+      <Toast visible={toast} message={toastMsg} />
 
       <AnimatePresence>
         {open && (
@@ -203,6 +243,71 @@ export default function PlantTree({ open, onClose, coords }) {
                   onChange={(e) => setDatetime(e.target.value)}
                   style={{ colorScheme: 'dark' }}
                 />
+
+                {/* ── Privacy Picker ─────────────────────────────────────── */}
+                <div style={{ marginBottom: 12 }}>
+                  <p style={{
+                    fontFamily: "'Poppins', sans-serif",
+                    fontWeight: 600,
+                    fontSize: 13,
+                    color: '#fff',
+                    marginBottom: 8,
+                  }}>
+                    Who can see this? 👁️
+                  </p>
+                  <div className="flex flex-col gap-2">
+                    {PRIVACY_OPTIONS.map((opt) => {
+                      const active = selectedPrivacy === opt.id
+                      return (
+                        <motion.button
+                          key={opt.id}
+                          type="button"
+                          onClick={() => setPrivacy(opt.id)}
+                          whileTap={{ scale: 0.97 }}
+                          className="flex items-center justify-between text-left border-none cursor-pointer"
+                          style={{
+                            borderRadius: 12,
+                            padding: '12px 14px',
+                            border: `1.5px solid ${active ? opt.borderSelected : 'rgba(82,183,136,0.15)'}`,
+                            background: active ? opt.bgSelected : 'transparent',
+                            transition: 'border-color 0.15s, background 0.15s',
+                          }}
+                        >
+                          <div>
+                            <p style={{
+                              fontFamily: "'Poppins', sans-serif",
+                              fontWeight: 600,
+                              fontSize: 13,
+                              color: '#fff',
+                              marginBottom: 2,
+                            }}>
+                              {opt.icon} {opt.title}
+                            </p>
+                            <p style={{
+                              fontFamily: "'Roboto', sans-serif",
+                              fontWeight: 400,
+                              fontSize: 11,
+                              color: '#74C69D',
+                            }}>
+                              {opt.subtitle}
+                            </p>
+                          </div>
+                          {/* Radio dot */}
+                          <div style={{
+                            width: 14,
+                            height: 14,
+                            borderRadius: '50%',
+                            flexShrink: 0,
+                            marginLeft: 12,
+                            border: active ? `2px solid ${opt.dotColor}` : '2px solid rgba(82,183,136,0.3)',
+                            background: active ? opt.dotColor : 'transparent',
+                            transition: 'background 0.15s, border-color 0.15s',
+                          }} />
+                        </motion.button>
+                      )
+                    })}
+                  </div>
+                </div>
 
                 <motion.button
                   type="submit"

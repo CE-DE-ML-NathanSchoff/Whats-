@@ -35,7 +35,7 @@ const HOW_IT_WORKS_ITEMS = [
   { icon: '🌰', stage: 'Seed',   meaning: 'A new idea\nor event posted' },
   { icon: '🌱', stage: 'Sprout', meaning: '1–2 neighbors\nwatered it' },
   { icon: '🌲', stage: 'Tree',   meaning: 'Growing fast\n3–10 neighbors' },
-  { icon: '🌳', stage: 'Oak',    meaning: 'Neighborhood\nlegend 10+' },
+  { icon: '🌳', stage: 'Ancient Oak ✨', meaning: 'Neighborhood\nlegend 10+' },
 ]
 
 const staggerContainer = {

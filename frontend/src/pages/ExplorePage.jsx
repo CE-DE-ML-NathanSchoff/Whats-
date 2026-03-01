@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import FilterSheet from '../components/Map/FilterSheet'
 import BottomNav from '../components/Nav/BottomNav'
+import SkeletonCard from '../components/UI/SkeletonCard'
 
 // ─── Stage data ───────────────────────────────────────────────────────────────
 
@@ -190,6 +191,12 @@ export default function ExplorePage() {
   const [activeSort, setActiveSort]   = useState('Newest')
   const [filters, setFilters]         = useState(DEFAULT_FILTERS)
   const [filterOpen, setFilterOpen]   = useState(false)
+  const [loading, setLoading]         = useState(true)
+
+  useEffect(() => {
+    const t = setTimeout(() => setLoading(false), 1200)
+    return () => clearTimeout(t)
+  }, [])
 
   const activeFilterCount =
     filters.stages.length +
@@ -315,8 +322,22 @@ export default function ExplorePage() {
         style={{ paddingBottom: 80, scrollbarWidth: 'none' }}
       >
         <AnimatePresence mode="wait">
-          {visiblePosts.length > 0 ? (
-            <motion.div key={activeSort + searchQuery}>
+          {loading ? (
+            <motion.div
+              key="skeleton"
+              initial={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <SkeletonCard count={4} />
+            </motion.div>
+          ) : visiblePosts.length > 0 ? (
+            <motion.div
+              key={activeSort + searchQuery}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.3 }}
+            >
               {visiblePosts.map((post, i) => (
                 <EventCard key={post.id} post={post} index={i} />
               ))}

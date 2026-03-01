@@ -35,6 +35,7 @@ const SEED_POSTS = [
     content: 'Fresh local produce every Saturday morning at Clark Park. Bring your own bags!',
     lat: 39.9541, lng: -75.1878,
     waters_count: 0, growth_stage: 'seed', is_branch: false,
+    privacy: 'public',
   },
   {
     id: 2,
@@ -42,6 +43,7 @@ const SEED_POSTS = [
     content: 'Free community yoga in Fairmount Park every Sunday at 8am. All levels welcome.',
     lat: 39.9726, lng: -75.1895,
     waters_count: 4, growth_stage: 'sapling', is_branch: true, parent_id: 3,
+    privacy: 'private_group',
   },
   {
     id: 3,
@@ -49,6 +51,7 @@ const SEED_POSTS = [
     content: 'Monthly cleanup crew keeping our streets beautiful. Gloves provided!',
     lat: 39.9621, lng: -75.1712,
     waters_count: 12, growth_stage: 'oak', is_branch: false,
+    privacy: 'public',
   },
   {
     id: 4,
@@ -56,6 +59,7 @@ const SEED_POSTS = [
     content: 'New raised beds available for the season. Sign up at the rec center.',
     lat: 39.9448, lng: -75.1602,
     waters_count: 2, growth_stage: 'sprout', is_branch: false,
+    privacy: 'invite_only',
   },
   {
     id: 5,
@@ -63,6 +67,7 @@ const SEED_POSTS = [
     content: 'Bring a book, take a book. Every Tuesday at Kingsessing Library.',
     lat: 39.9381, lng: -75.1823,
     waters_count: 7, growth_stage: 'tree', is_branch: false,
+    privacy: 'public',
   },
 ]
 

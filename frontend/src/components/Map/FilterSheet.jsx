@@ -8,7 +8,7 @@ const STAGE_OPTIONS = [
   { value: 'sprout',  label: '🌱 sprout',  color: '#74C69D' },
   { value: 'sapling', label: '🌿 sapling', color: '#52B788' },
   { value: 'tree',    label: '🌲 tree',    color: '#2D6A4F' },
-  { value: 'oak',     label: '🌳 oak',     color: '#FFD700' },
+  { value: 'oak',     label: '🌳 Ancient Oak ✨', color: '#FFD700' },
 ]
 
 const DISTANCE_OPTIONS = ['10 mi', '20 mi', '30 mi', '40 mi', '50 mi', 'Custom']
