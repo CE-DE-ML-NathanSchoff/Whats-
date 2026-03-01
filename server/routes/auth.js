@@ -32,6 +32,10 @@ router.post('/register', registerValidators, async (req, res) => {
   }
   const { username, email, password, phone_number, display_name, bio } = req.body;
 
+  // #region agent log
+  console.error('[DEBUG-d650cc]', JSON.stringify({ sessionId: 'd650cc', location: 'auth.js:register', message: 'register started', data: { bodyKeys: Object.keys(req.body || {}) }, timestamp: Date.now(), hypothesisId: 'H0' }));
+  // #endregion
+
   try {
     const existingUsername = await userService.findByUsername(username);
     if (existingUsername) {
@@ -42,6 +46,9 @@ router.post('/register', registerValidators, async (req, res) => {
       return res.status(409).json({ error: 'Email already registered' });
     }
 
+    // #region agent log
+    console.error('[DEBUG-d650cc]', JSON.stringify({ sessionId: 'd650cc', location: 'auth.js:register', message: 'step', data: { step: 'beforeCreateUser' }, timestamp: Date.now(), hypothesisId: 'H2' }));
+    // #endregion
     const user = await userService.createUser({
       username,
       email,
@@ -51,7 +58,16 @@ router.post('/register', registerValidators, async (req, res) => {
       bio: bio || undefined,
     });
 
+    // #region agent log
+    console.error('[DEBUG-d650cc]', JSON.stringify({ sessionId: 'd650cc', location: 'auth.js:register', message: 'step', data: { step: 'afterCreateUser', userId: user && user.id }, timestamp: Date.now(), hypothesisId: 'H3' }));
+    // #endregion
+    // #region agent log
+    console.error('[DEBUG-d650cc]', JSON.stringify({ sessionId: 'd650cc', location: 'auth.js:register', message: 'step', data: { step: 'beforeFriendGroup' }, timestamp: Date.now(), hypothesisId: 'H4' }));
+    // #endregion
     await communityService.createFriendGroupForUser(user.id);
+    // #region agent log
+    console.error('[DEBUG-d650cc]', JSON.stringify({ sessionId: 'd650cc', location: 'auth.js:register', message: 'step', data: { step: 'beforeConfig' }, timestamp: Date.now(), hypothesisId: 'H5' }));
+    // #endregion
     await userConfigService.getOrCreateDefaultConfig(user.id);
 
     const token = signToken({ id: user.id, username: user.username });
@@ -72,8 +88,17 @@ router.post('/register', registerValidators, async (req, res) => {
       token,
     });
   } catch (err) {
+    // #region agent log
+    console.error('[DEBUG-d650cc]', JSON.stringify({ sessionId: 'd650cc', location: 'auth.js:register catch', message: 'register error', data: { message: String(err && err.message), name: String(err && err.name), code: err && err.code, stack: (err && err.stack) || null }, timestamp: Date.now(), hypothesisId: 'H1' }));
+    // #endregion
     console.error('Register error:', err);
-    return res.status(500).json({ error: 'Registration failed' });
+    const detail = err && err.message ? String(err.message) : undefined;
+    const code = err && err.code != null ? err.code : undefined;
+    return res.status(500).json({
+      error: 'Registration failed',
+      ...(detail && { detail }),
+      ...(code != null && { code }),
+    });
   }
 });
 
@@ -117,7 +142,13 @@ router.post('/login', loginValidators, async (req, res) => {
     return res.json({ user: safeUser, token });
   } catch (err) {
     console.error('Login error:', err);
-    return res.status(500).json({ error: 'Login failed' });
+    const detail = err && err.message ? String(err.message) : undefined;
+    const code = err && err.code != null ? err.code : undefined;
+    return res.status(500).json({
+      error: 'Login failed',
+      ...(detail && { detail }),
+      ...(code != null && { code }),
+    });
   }
 });
 
@@ -137,7 +168,13 @@ router.get('/me', requireAuth, async (req, res) => {
     return res.json({ ...user, local_location_ids, config });
   } catch (err) {
     console.error('Me error:', err);
-    return res.status(500).json({ error: 'Failed to load user' });
+    const detail = err && err.message ? String(err.message) : undefined;
+    const code = err && err.code != null ? err.code : undefined;
+    return res.status(500).json({
+      error: 'Failed to load user',
+      ...(detail && { detail }),
+      ...(code != null && { code }),
+    });
   }
 });
 
