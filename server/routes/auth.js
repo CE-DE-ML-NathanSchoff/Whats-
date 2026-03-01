@@ -32,10 +32,6 @@ router.post('/register', registerValidators, async (req, res) => {
   }
   const { username, email, password, phone_number, display_name, bio } = req.body;
 
-  // #region agent log
-  console.error('[DEBUG-d650cc]', JSON.stringify({ sessionId: 'd650cc', location: 'auth.js:register', message: 'register started', data: { bodyKeys: Object.keys(req.body || {}) }, timestamp: Date.now(), hypothesisId: 'H0' }));
-  // #endregion
-
   try {
     const existingUsername = await userService.findByUsername(username);
     if (existingUsername) {
@@ -46,9 +42,6 @@ router.post('/register', registerValidators, async (req, res) => {
       return res.status(409).json({ error: 'Email already registered' });
     }
 
-    // #region agent log
-    console.error('[DEBUG-d650cc]', JSON.stringify({ sessionId: 'd650cc', location: 'auth.js:register', message: 'step', data: { step: 'beforeCreateUser' }, timestamp: Date.now(), hypothesisId: 'H2' }));
-    // #endregion
     const user = await userService.createUser({
       username,
       email,
@@ -58,17 +51,13 @@ router.post('/register', registerValidators, async (req, res) => {
       bio: bio || undefined,
     });
 
-    // #region agent log
-    console.error('[DEBUG-d650cc]', JSON.stringify({ sessionId: 'd650cc', location: 'auth.js:register', message: 'step', data: { step: 'afterCreateUser', userId: user && user.id }, timestamp: Date.now(), hypothesisId: 'H3' }));
-    // #endregion
-    // #region agent log
-    console.error('[DEBUG-d650cc]', JSON.stringify({ sessionId: 'd650cc', location: 'auth.js:register', message: 'step', data: { step: 'beforeFriendGroup' }, timestamp: Date.now(), hypothesisId: 'H4' }));
-    // #endregion
-    await communityService.createFriendGroupForUser(user.id);
-    // #region agent log
-    console.error('[DEBUG-d650cc]', JSON.stringify({ sessionId: 'd650cc', location: 'auth.js:register', message: 'step', data: { step: 'beforeConfig' }, timestamp: Date.now(), hypothesisId: 'H5' }));
-    // #endregion
-    await userConfigService.getOrCreateDefaultConfig(user.id);
+    // Non-fatal post-creation steps: don't block registration if these fail
+    // (e.g. missing columns/tables from un-run migrations)
+    try { await communityService.createFriendGroupForUser(user.id); }
+    catch (e) { console.error('Friend group creation failed (non-fatal):', e.message); }
+
+    try { await userConfigService.getOrCreateDefaultConfig(user.id); }
+    catch (e) { console.error('Default config creation failed (non-fatal):', e.message); }
 
     const token = signToken({ id: user.id, username: user.username });
     return res.status(201).json({
@@ -81,15 +70,11 @@ router.post('/register', registerValidators, async (req, res) => {
         display_name: user.display_name,
         bio: user.bio,
         avatar_url: user.avatar_url,
-        location: user.location,
         created_at: user.created_at,
       },
       token,
     });
   } catch (err) {
-    // #region agent log
-    console.error('[DEBUG-d650cc]', JSON.stringify({ sessionId: 'd650cc', location: 'auth.js:register catch', message: 'register error', data: { message: String(err && err.message), name: String(err && err.name), code: err && err.code, stack: (err && err.stack) || null }, timestamp: Date.now(), hypothesisId: 'H1' }));
-    // #endregion
     console.error('Register error:', err);
     const detail = err && err.message ? String(err.message) : undefined;
     const code = err && err.code != null ? err.code : undefined;
@@ -134,7 +119,6 @@ router.post('/login', loginValidators, async (req, res) => {
       display_name: user.DISPLAY_NAME ?? user.display_name,
       bio: user.BIO ?? user.bio,
       avatar_url: user.AVATAR_URL ?? user.avatar_url ?? null,
-      location: user.LOCATION ?? user.location ?? null,
       created_at: user.CREATED_AT || user.created_at,
     };
     return res.json({ user: safeUser, token });

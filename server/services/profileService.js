@@ -53,7 +53,6 @@ export async function getPublicProfile(profileUserId, viewerId) {
     display_name: user.display_name ?? null,
     bio: user.bio ?? null,
     avatar_url: user.avatar_url ?? null,
-    location: privacy.show_location !== false ? (user.location ?? null) : null,
     created_at: user.created_at,
   };
 

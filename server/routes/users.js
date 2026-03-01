@@ -235,7 +235,6 @@ const updateValidators = [
   body('bio').optional().trim().isLength({ max: 1000 }),
   body('avatar_url').optional().trim().isLength({ max: 500 }),
   body('phone_number').optional().trim().isLength({ max: 50 }),
-  body('location').optional().trim().isLength({ max: 500 }),
 ];
 
 /**
