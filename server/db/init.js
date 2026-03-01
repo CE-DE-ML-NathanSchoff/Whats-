@@ -47,9 +47,12 @@ async function setupKeyPair(execute, keyPath) {
   }
   console.log('Generating RSA key pair for key-pair auth (24/7)...');
   const { publicKeyPem, privateKeyPem } = generateKeyPair();
-  const escapedPem = publicKeyPem.replace(/'/g, "''").replace(/\r?\n/g, '\\n');
+  const pubKeyBody = publicKeyPem
+    .replace(/-----BEGIN PUBLIC KEY-----/, '')
+    .replace(/-----END PUBLIC KEY-----/, '')
+    .replace(/\s/g, '');
   const snowflakeUser = username.toUpperCase().replace(/"/g, '');
-  const sql = `ALTER USER ${snowflakeUser} SET RSA_PUBLIC_KEY = '${escapedPem}'`;
+  const sql = `ALTER USER ${snowflakeUser} SET RSA_PUBLIC_KEY = '${pubKeyBody}'`;
   await execute(sql);
   console.log('Public key registered for user', username);
   const dir = path.dirname(keyPath);
@@ -257,10 +260,16 @@ async function runSchema(execute) {
   console.log('Table event_ratings created or already exists.');
   await execute(EVENT_WATERS_TABLE);
   console.log('Table event_waters created or already exists.');
-  await execute('ALTER TABLE events ADD COLUMN IF NOT EXISTS waters_count INT DEFAULT 0');
-  console.log('Column waters_count added or already exists.');
-  await execute('ALTER TABLE events ADD COLUMN IF NOT EXISTS link VARCHAR(2000)');
-  console.log('Column link added or already exists.');
+  for (const [col, def] of [['waters_count', 'INT DEFAULT 0'], ['link', 'VARCHAR(2000)']]) {
+    try {
+      await execute(`ALTER TABLE events ADD COLUMN IF NOT EXISTS ${col} ${def}`);
+      console.log(`Column ${col} added or already exists.`);
+    } catch (e) {
+      if (/ambiguous|already exists/i.test(e.message)) {
+        console.log(`Column ${col} already exists, skipping.`);
+      } else throw e;
+    }
+  }
 }
 
 async function init() {

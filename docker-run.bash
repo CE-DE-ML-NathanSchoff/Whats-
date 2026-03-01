@@ -166,12 +166,13 @@ if [ "$RUN_INIT_DB" = "1" ]; then
   echo "Running one-time DB init (Snowflake schema)..."
   echo "With key-pair (default): you will be prompted for your MFA code once; init-db creates a key and writes it to a volume so the app can use it 24/7."
   KEY_VOLUME="${KEY_VOLUME:-comunitree_snowflake_keys}"
-  INIT_ERR=$(docker run -it --rm -v "${KEY_VOLUME}:/secrets" --env-file "$ENV_FILE" -e SNOWFLAKE_PRIVATE_KEY_PATH=/secrets/snowflake_rsa_key.p8 "$IMAGE" node server/db/init.js 2>&1); INIT_RET=$?
+  set +e
+  docker run -it --rm -v "${KEY_VOLUME}:/secrets" --env-file "$ENV_FILE" -e SNOWFLAKE_PRIVATE_KEY_PATH=/secrets/snowflake_rsa_key.p8 "$IMAGE" node server/db/init.js
+  INIT_RET=$?
+  set -e
   if [ "$INIT_RET" -ne 0 ]; then
-    dbg_log "step_failed" "\"step\":4,\"error\":\"$(sanitize_err "$INIT_ERR")\""
-    echo "DB init failed. Fix .env (Snowflake credentials, key path, or MFA) and run again with --init-db." >&2
-    echo "$INIT_ERR" >&2
-    show_docker_permission_hint "$INIT_ERR" "$@"
+    dbg_log "step_failed" "\"step\":4,\"error\":\"init-db exited with code $INIT_RET\""
+    echo "DB init failed (exit code $INIT_RET). Fix .env (Snowflake credentials, key path, or MFA) and run again with --init-db." >&2
     exit 1
   fi
   echo "DB init completed."
