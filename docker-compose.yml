@@ -1,13 +1,8 @@
-version: '3.8'
-
 services:
-  web:
-    build: .
+  app:
+    image: ghcr.io/ce-de-ml-nathanschoff/whats:main
     ports:
       - "8000:8000"
-    volumes:
-      # This is the magic line. It maps the 'data' folder on your machine
-      # to the '/app/data' folder inside the container. 
-      # Your SQLite database will live here and survive restarts!
-      - ./data:/app/data
+    env_file:
+      - .env
     restart: unless-stopped

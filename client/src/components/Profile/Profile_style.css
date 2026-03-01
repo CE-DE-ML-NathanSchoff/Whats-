@@ -1,0 +1,625 @@
+/* account profile screen */
+
+position: relative;
+width: 360px;
+height: 640px;
+
+background: #FFFFFF;
+
+
+/* Rectangle 19 */
+
+position: absolute;
+width: 360px;
+height: 76px;
+left: 0px;
+top: 0px;
+
+background: #1BBC65;
+
+
+/* My Profile */
+
+position: absolute;
+width: 89px;
+height: 27px;
+left: 54px;
+top: 20px;
+
+/* page title */
+font-family: 'Poppins';
+font-style: normal;
+font-weight: 600;
+font-size: 18px;
+line-height: 27px;
+/* identical to box height */
+display: flex;
+align-items: center;
+
+color: #FFFFFF;
+
+
+
+/* edit */
+
+position: absolute;
+width: 24px;
+height: 24px;
+left: 284px;
+top: 21px;
+
+
+
+/* Vector */
+
+position: absolute;
+left: 8.33%;
+right: 16.67%;
+top: 16.67%;
+bottom: 8.33%;
+
+border: 2px solid #FFFFFF;
+
+
+/* Vector */
+
+position: absolute;
+left: 33.33%;
+right: 7.83%;
+top: 7.83%;
+bottom: 33.33%;
+
+border: 2px solid #FFFFFF;
+
+
+/* arrow-left-circle */
+
+position: absolute;
+width: 24px;
+height: 24px;
+left: 20px;
+top: 21px;
+
+
+
+/* Vector */
+
+position: absolute;
+left: 8.33%;
+right: 8.33%;
+top: 8.33%;
+bottom: 8.33%;
+
+border: 2px solid #FFFFFF;
+
+
+/* Vector */
+
+position: absolute;
+left: 33.33%;
+right: 50%;
+top: 33.33%;
+bottom: 33.33%;
+
+border: 2px solid #FFFFFF;
+
+
+/* Vector */
+
+position: absolute;
+left: 33.33%;
+right: 33.33%;
+top: 50%;
+bottom: 50%;
+
+border: 2px solid #FFFFFF;
+
+
+/* Edit */
+
+position: absolute;
+width: 24px;
+height: 22px;
+left: 316px;
+top: 23px;
+
+/* form label */
+font-family: 'Roboto';
+font-style: normal;
+font-weight: 400;
+font-size: 14px;
+line-height: 22px;
+/* identical to box height, or 157% */
+
+color: #FFFFFF;
+
+
+
+/* Name */
+
+position: absolute;
+width: 38px;
+height: 22px;
+left: 62px;
+top: 193px;
+
+font-family: 'Roboto';
+font-style: normal;
+font-weight: 400;
+font-size: 14px;
+line-height: 22px;
+/* identical to box height, or 157% */
+
+color: rgba(40, 51, 45, 0.7);
+
+
+
+/* Place */
+
+position: absolute;
+width: 35px;
+height: 22px;
+left: 62px;
+top: 257px;
+
+font-family: 'Roboto';
+font-style: normal;
+font-weight: 400;
+font-size: 14px;
+line-height: 22px;
+/* identical to box height, or 157% */
+
+color: rgba(40, 51, 45, 0.7);
+
+
+
+/* Blood Group */
+
+position: absolute;
+width: 78px;
+height: 22px;
+left: 62px;
+top: 321px;
+
+font-family: 'Roboto';
+font-style: normal;
+font-weight: 400;
+font-size: 14px;
+line-height: 22px;
+/* identical to box height, or 157% */
+
+color: rgba(40, 51, 45, 0.7);
+
+
+
+/* User Type */
+
+position: absolute;
+width: 62px;
+height: 22px;
+left: 62px;
+top: 385px;
+
+font-family: 'Roboto';
+font-style: normal;
+font-weight: 400;
+font-size: 14px;
+line-height: 22px;
+/* identical to box height, or 157% */
+
+color: rgba(40, 51, 45, 0.7);
+
+
+
+/* Phone Number */
+
+position: absolute;
+width: 94px;
+height: 22px;
+left: 62px;
+top: 449px;
+
+font-family: 'Roboto';
+font-style: normal;
+font-weight: 400;
+font-size: 14px;
+line-height: 22px;
+/* identical to box height, or 157% */
+
+color: rgba(40, 51, 45, 0.7);
+
+
+
+/* Email Address */
+
+position: absolute;
+width: 90px;
+height: 22px;
+left: 62px;
+top: 514px;
+
+font-family: 'Roboto';
+font-style: normal;
+font-weight: 400;
+font-size: 14px;
+line-height: 22px;
+/* identical to box height, or 157% */
+
+color: #28332D;
+
+
+
+/* Arjun Das */
+
+position: absolute;
+width: 74px;
+height: 22px;
+left: 62px;
+top: 215px;
+
+font-family: 'Roboto';
+font-style: normal;
+font-weight: 500;
+font-size: 17px;
+line-height: 22px;
+/* identical to box height, or 129% */
+
+color: #28332D;
+
+
+
+/* Coimbatore, Tamil Nadu */
+
+position: absolute;
+width: 183px;
+height: 22px;
+left: 62px;
+top: 279px;
+
+font-family: 'Roboto';
+font-style: normal;
+font-weight: 500;
+font-size: 17px;
+line-height: 22px;
+/* identical to box height, or 129% */
+
+color: #28332D;
+
+
+
+/* - */
+
+position: absolute;
+width: 6px;
+height: 22px;
+left: 62px;
+top: 343px;
+
+font-family: 'Roboto';
+font-style: normal;
+font-weight: 500;
+font-size: 17px;
+line-height: 22px;
+/* identical to box height, or 129% */
+
+color: #28332D;
+
+
+
+/* Admin */
+
+position: absolute;
+width: 50px;
+height: 22px;
+left: 62px;
+top: 407px;
+
+font-family: 'Roboto';
+font-style: normal;
+font-weight: 500;
+font-size: 17px;
+line-height: 22px;
+/* identical to box height, or 129% */
+
+color: #28332D;
+
+
+
+/* +91 99887 76655 */
+
+position: absolute;
+width: 134px;
+height: 22px;
+left: 62px;
+top: 471px;
+
+font-family: 'Roboto';
+font-style: normal;
+font-weight: 500;
+font-size: 17px;
+line-height: 22px;
+/* identical to box height, or 129% */
+
+color: #28332D;
+
+
+
+/* call_black_24dp 1 */
+
+position: absolute;
+width: 26px;
+height: 26px;
+left: 22px;
+top: 448px;
+
+
+
+/* Vector */
+
+position: absolute;
+left: 0%;
+right: 0%;
+top: 0%;
+bottom: 0%;
+
+
+
+/* Vector */
+
+position: absolute;
+left: 12.5%;
+right: 12.5%;
+top: 12.5%;
+bottom: 12.5%;
+
+background: #AB9D78;
+
+
+/* arjundas@mail.com */
+
+position: absolute;
+width: 152px;
+height: 22px;
+left: 62px;
+top: 536px;
+
+font-family: 'Roboto';
+font-style: normal;
+font-weight: 500;
+font-size: 17px;
+line-height: 22px;
+/* identical to box height, or 129% */
+
+color: #28332D;
+
+
+
+/* Group 7 */
+
+position: absolute;
+width: 80px;
+height: 80px;
+left: 20px;
+top: 96px;
+
+
+
+/* Ellipse 3 */
+
+box-sizing: border-box;
+
+position: absolute;
+width: 80px;
+height: 80px;
+left: 20px;
+top: 96px;
+
+background: #FFFFFF;
+border: 1px solid #1BBC65;
+
+
+/* user */
+
+position: absolute;
+width: 24px;
+height: 24px;
+left: 48px;
+top: 124px;
+
+
+
+/* Vector */
+
+position: absolute;
+left: 16.67%;
+right: 16.67%;
+top: 62.5%;
+bottom: 12.5%;
+
+border: 2px solid #1BBC65;
+
+
+/* Vector */
+
+position: absolute;
+left: 33.33%;
+right: 33.33%;
+top: 12.5%;
+bottom: 54.17%;
+
+border: 2px solid #1BBC65;
+
+
+/* bloodtype_black_24dp 1 */
+
+position: absolute;
+width: 26px;
+height: 26px;
+left: 20px;
+top: 320px;
+
+
+
+/* Group */
+
+position: absolute;
+left: 0%;
+right: 0%;
+top: 0%;
+bottom: 0%;
+
+
+
+/* Vector */
+
+position: absolute;
+left: 0%;
+right: 0%;
+top: 0%;
+bottom: 0%;
+
+
+
+/* Group */
+
+position: absolute;
+left: 16.67%;
+right: 16.67%;
+top: 8.33%;
+bottom: 8.33%;
+
+
+
+/* Vector */
+
+position: absolute;
+left: 16.67%;
+right: 16.67%;
+top: 8.33%;
+bottom: 8.33%;
+
+background: #FF82E3;
+
+
+/* account_box_black_24dp 1 */
+
+position: absolute;
+width: 26px;
+height: 26px;
+left: 20px;
+top: 192px;
+
+
+
+/* Vector */
+
+position: absolute;
+left: 0%;
+right: 0%;
+top: 0%;
+bottom: 0%;
+
+
+
+/* Vector */
+
+position: absolute;
+left: 12.5%;
+right: 12.5%;
+top: 12.5%;
+bottom: 12.5%;
+
+background: #AF80FC;
+
+
+/* location_on_black_24dp 1 */
+
+position: absolute;
+width: 26px;
+height: 26px;
+left: 20px;
+top: 256px;
+
+
+
+/* Vector */
+
+position: absolute;
+left: 0%;
+right: 0%;
+top: 0%;
+bottom: 0%;
+
+
+
+/* Vector */
+
+position: absolute;
+left: 20.83%;
+right: 20.83%;
+top: 8.33%;
+bottom: 8.33%;
+
+background: #F5CA31;
+
+
+/* supervised_user_circle_black_24dp 1 */
+
+position: absolute;
+width: 26px;
+height: 26px;
+left: 20px;
+top: 384px;
+
+
+
+/* Vector */
+
+position: absolute;
+left: 0%;
+right: 0%;
+top: 0%;
+bottom: 0%;
+
+
+
+/* Vector */
+
+position: absolute;
+left: 8.29%;
+right: 8.38%;
+top: 8.33%;
+bottom: 8.33%;
+
+background: #28C7AA;
+
+
+/* email_black_24dp 1 */
+
+position: absolute;
+width: 26px;
+height: 26px;
+left: 20px;
+top: 513px;
+
+
+
+/* Vector */
+
+position: absolute;
+left: 0%;
+right: 0%;
+top: 0%;
+bottom: 0%;
+
+
+
+/* Vector */
+
+position: absolute;
+left: 8.33%;
+right: 8.33%;
+top: 16.67%;
+bottom: 16.67%;
+
+background: #FB9E6E;
