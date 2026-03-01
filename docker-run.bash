@@ -186,35 +186,61 @@ if [ "$RUN_INIT_DB" = "1" ]; then
   echo "Running one-time DB init (Snowflake schema)..."
   echo "With key-pair (default): you will be prompted for your MFA code once; init-db generates a key pair, registers it with Snowflake, and saves the private key to .env."
 
-  # Bind-mount SCRIPT_DIR into the container so init.js writes the .p8 file directly to the host
   TEMP_KEY_FILE="${SCRIPT_DIR}/.snowflake_rsa_key_tmp.p8"
-  CONTAINER_MOUNT="/host_env"
-  CONTAINER_KEY_PATH="${CONTAINER_MOUNT}/.snowflake_rsa_key_tmp.p8"
   rm -f "$TEMP_KEY_FILE" 2>/dev/null || true
 
-  set +e
-  docker run -it --rm \
-    -v "${SCRIPT_DIR}:${CONTAINER_MOUNT}" \
+  # #region agent log
+  DEBUG_LOG="${SCRIPT_DIR}/.cursor/debug-843cca.log"
+  mkdir -p "$(dirname "$DEBUG_LOG")" 2>/dev/null
+  # H3/H4: Log the env file's key path value and what this script is passing
+  ENV_KEY_PATH_VAL=$(grep '^SNOWFLAKE_PRIVATE_KEY_PATH=' "$ENV_FILE" 2>/dev/null || echo "(not set)")
+  ENV_KEY_VAL_LEN=$(grep '^SNOWFLAKE_PRIVATE_KEY=' "$ENV_FILE" 2>/dev/null | cut -d= -f2- | wc -c | tr -d ' ')
+  echo "{\"sessionId\":\"843cca\",\"hypothesisId\":\"H3_H4\",\"location\":\"docker-run.bash:step4\",\"message\":\"env_file_values\",\"data\":{\"SNOWFLAKE_PRIVATE_KEY_PATH_in_env\":\"${ENV_KEY_PATH_VAL}\",\"SNOWFLAKE_PRIVATE_KEY_len\":${ENV_KEY_VAL_LEN:-0},\"script_will_pass\":\"/tmp/snowflake_rsa_key.p8\"},\"timestamp\":$(date +%s)000}" >> "$DEBUG_LOG"
+  # H1/H2: Run diagnostic container to check user, writable dirs
+  DIAG=$(docker run --rm --env-file "$ENV_FILE" -e SNOWFLAKE_PRIVATE_KEY_PATH="/tmp/snowflake_rsa_key.p8" "$IMAGE" sh -c \
+    'echo "uid=$(id -u) user=$(whoami) tmp_writable=$(test -w /tmp && echo yes || echo no) app_writable=$(test -w /app && echo yes || echo no) key_path_env=${SNOWFLAKE_PRIVATE_KEY_PATH}"' 2>&1 || echo "diag_failed")
+  echo "{\"sessionId\":\"843cca\",\"hypothesisId\":\"H1_H2\",\"location\":\"docker-run.bash:step4_diag\",\"message\":\"container_diagnostics\",\"data\":{\"diag\":\"${DIAG}\"},\"timestamp\":$(date +%s)000}" >> "$DEBUG_LOG"
+  # #endregion
+
+  # Use docker create/start/cp to avoid all mount permission issues:
+  # init.js writes to /tmp (always writable), then we docker cp it out
+  INIT_CONTAINER=$(docker create -it \
     --env-file "$ENV_FILE" \
-    -e SNOWFLAKE_PRIVATE_KEY_PATH="$CONTAINER_KEY_PATH" \
-    "$IMAGE" node server/db/init.js
+    -e SNOWFLAKE_PRIVATE_KEY_PATH="/tmp/snowflake_rsa_key.p8" \
+    "$IMAGE" node server/db/init.js)
+
+  set +e
+  docker start -ai "$INIT_CONTAINER"
   INIT_RET=$?
   set -e
 
+  # #region agent log
+  echo "{\"sessionId\":\"843cca\",\"hypothesisId\":\"H1_H2\",\"location\":\"docker-run.bash:step4_post\",\"message\":\"init_exit\",\"data\":{\"exit_code\":${INIT_RET}},\"timestamp\":$(date +%s)000}" >> "$DEBUG_LOG"
+  # #endregion
+
   if [ "$INIT_RET" -ne 0 ]; then
-    rm -f "$TEMP_KEY_FILE" 2>/dev/null || true
+    docker rm "$INIT_CONTAINER" >/dev/null 2>&1 || true
     dbg_log "step_failed" "\"step\":4,\"error\":\"init-db exited with code $INIT_RET\""
     echo "DB init failed (exit code $INIT_RET). Fix .env (Snowflake credentials or MFA) and run again with --init-db." >&2
     exit 1
   fi
 
-  # Read the key file from the host, inject into .env, then delete the temp file
-  if [ -f "$TEMP_KEY_FILE" ]; then
+  # Copy the key file out of the stopped container, then remove it
+  docker cp "${INIT_CONTAINER}:/tmp/snowflake_rsa_key.p8" "$TEMP_KEY_FILE" 2>/dev/null
+  CP_RET=$?
+  docker rm "$INIT_CONTAINER" >/dev/null 2>&1 || true
+
+  # #region agent log
+  echo "{\"sessionId\":\"843cca\",\"hypothesisId\":\"H1_H2\",\"location\":\"docker-run.bash:step4_cp\",\"message\":\"docker_cp_result\",\"data\":{\"cp_exit\":${CP_RET},\"file_exists\":\"$(test -f "$TEMP_KEY_FILE" && echo yes || echo no)\",\"file_size\":\"$(wc -c < "$TEMP_KEY_FILE" 2>/dev/null || echo 0)\"},\"timestamp\":$(date +%s)000}" >> "$DEBUG_LOG"
+  # #endregion
+
+  if [ -f "$TEMP_KEY_FILE" ] && [ -s "$TEMP_KEY_FILE" ]; then
     KEY_PEM=$(cat "$TEMP_KEY_FILE")
     rm -f "$TEMP_KEY_FILE"
     inject_key_into_env "$KEY_PEM"
     echo "DB init completed. Key saved to .env."
   else
+    rm -f "$TEMP_KEY_FILE" 2>/dev/null || true
     echo "DB init completed but no new key file was written." >&2
     echo "  If key-pair auth was already set up, the existing SNOWFLAKE_PRIVATE_KEY in .env will be used." >&2
   fi
