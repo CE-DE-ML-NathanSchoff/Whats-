@@ -13,6 +13,8 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ENV_FILE="${SCRIPT_DIR}/.env"
+ENV_EXAMPLE="${SCRIPT_DIR}/.env.example"
 IMAGE="${IMAGE:-ghcr.io/ce-de-ml-nathanschoff/whats:main}"
 PORT="${PORT:-8000}"
 CONTAINER_NAME="${CONTAINER_NAME:-comunitree}"
@@ -58,18 +60,19 @@ fi
 # --- Step 2: Ensure .env with required values ---
 debug "Step 2: Ensuring .env"
 need_env_prompt=0
-if [ ! -f .env ]; then
-  if [ -f .env.example ]; then
-    cp .env.example .env
+if [ ! -f "$ENV_FILE" ]; then
+  if [ -f "$ENV_EXAMPLE" ]; then
+    cp "$ENV_EXAMPLE" "$ENV_FILE"
     echo "Created .env from .env.example."
     need_env_prompt=1
   else
-    echo "Error: No .env or .env.example found." >&2
+    echo "Error: No .env or .env.example found in: $SCRIPT_DIR" >&2
+    echo "Run this script from the Comunitree repo root (where .env.example lives), or copy .env.example there." >&2
     exit 1
   fi
 else
   # Check for placeholders
-  if grep -q 'your_account_identifier\|your_username\|your_password\|your-super-secret-jwt-key-change-in-production' .env 2>/dev/null; then
+  if grep -q 'your_account_identifier\|your_username\|your_password\|your-super-secret-jwt-key-change-in-production' "$ENV_FILE" 2>/dev/null; then
     need_env_prompt=1
   fi
 fi
@@ -109,7 +112,7 @@ if [ "$need_env_prompt" = "1" ]; then
   export SNOWFLAKE_WAREHOUSE SNOWFLAKE_DATABASE SNOWFLAKE_SCHEMA SNOWFLAKE_ROLE
 
   # Write .env: replace placeholders with user-provided values
-  if [ -f .env.example ]; then
+  if [ -f "$ENV_EXAMPLE" ]; then
     sed -e "s|your-super-secret-jwt-key-change-in-production|$JWT_SECRET|g" \
         -e "s|your_account_identifier|$SNOWFLAKE_ACCOUNT|g" \
         -e "s|your_username|$SNOWFLAKE_USERNAME|g" \
@@ -118,7 +121,7 @@ if [ "$need_env_prompt" = "1" ]; then
         -e "s|^SNOWFLAKE_DATABASE=.*|SNOWFLAKE_DATABASE=$SNOWFLAKE_DATABASE|" \
         -e "s|^SNOWFLAKE_SCHEMA=.*|SNOWFLAKE_SCHEMA=$SNOWFLAKE_SCHEMA|" \
         -e "s|^SNOWFLAKE_ROLE=.*|SNOWFLAKE_ROLE=$SNOWFLAKE_ROLE|" \
-        .env.example > .env
+        "$ENV_EXAMPLE" > "$ENV_FILE"
   fi
   echo ""
   echo ".env has been updated. For MFA, edit .env and set SNOWFLAKE_AUTHENTICATOR=USERNAME_PASSWORD_MFA and SNOWFLAKE_PASSCODE before running --init-db."
@@ -147,7 +150,7 @@ if [ "$RUN_INIT_DB" = "1" ]; then
   # #endregion
   debug "Step 4a: Running Snowflake schema init"
   echo "Running one-time DB init (Snowflake schema)..."
-  INIT_ERR=$(docker run --rm --env-file .env "$IMAGE" node server/db/init.js 2>&1); INIT_RET=$?
+  INIT_ERR=$(docker run --rm --env-file "$ENV_FILE" "$IMAGE" node server/db/init.js 2>&1); INIT_RET=$?
   if [ "$INIT_RET" -ne 0 ]; then
     dbg_log "step_failed" "\"step\":4,\"error\":\"$(sanitize_err "$INIT_ERR")\""
     echo "DB init failed. Fix .env (e.g. Snowflake credentials, MFA passcode) and run again with --init-db." >&2
@@ -162,9 +165,9 @@ fi
 if [ "$RUN_MIGRATE" = "1" ]; then
   debug "Step 5: Running migrations"
   echo "Running migration: migratePrivateAndFriends..."
-  docker run --rm --env-file .env "$IMAGE" node server/db/migratePrivateAndFriends.js
+  docker run --rm --env-file "$ENV_FILE" "$IMAGE" node server/db/migratePrivateAndFriends.js
   echo "Running migration: migrateProfileAndConfig..."
-  docker run --rm --env-file .env "$IMAGE" node server/db/migrateProfileAndConfig.js
+  docker run --rm --env-file "$ENV_FILE" "$IMAGE" node server/db/migrateProfileAndConfig.js
   echo "Migrations completed."
 fi
 
@@ -190,10 +193,10 @@ DETACH="-d"
 
 echo "Starting Comunitree on port $PORT..."
 if [ "$FOREGROUND" = "1" ]; then
-  exec docker run -p "${PORT}:8000" --name "$CONTAINER_NAME" --env-file .env --rm $DETACH "$IMAGE"
+  exec docker run -p "${PORT}:8000" --name "$CONTAINER_NAME" --env-file "$ENV_FILE" --rm $DETACH "$IMAGE"
 fi
 
-RUN_ERR=$(docker run $DETACH -p "${PORT}:8000" --name "$CONTAINER_NAME" --env-file .env --restart unless-stopped "$IMAGE" 2>&1); RUN_RET=$?
+RUN_ERR=$(docker run $DETACH -p "${PORT}:8000" --name "$CONTAINER_NAME" --env-file "$ENV_FILE" --restart unless-stopped "$IMAGE" 2>&1); RUN_RET=$?
 if [ "$RUN_RET" -ne 0 ]; then
   dbg_log "step_failed" "\"step\":7,\"error\":\"$(sanitize_err "$RUN_ERR")\""
   echo "Error: failed to run container" >&2
