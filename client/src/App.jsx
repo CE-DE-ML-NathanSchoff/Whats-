@@ -37,10 +37,13 @@ function GuestRoute({ children }) {
   return children
 }
 
+// Base path when deployed at subpath (e.g. /communitree) — must match Vite base
+const basename = (import.meta.env.BASE_URL || '/').replace(/\/$/, '') || '/'
+
 function App() {
   return (
     <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-      <BrowserRouter>
+      <BrowserRouter basename={basename}>
         <Routes>
           <Route path="/login" element={<GuestRoute><LoginPage /></GuestRoute>} />
           <Route path="/register" element={<GuestRoute><RegisterPage /></GuestRoute>} />

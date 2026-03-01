@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { createServer } from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import fs from 'fs';
 import express from 'express';
 import cors from 'cors';
 import { createProxyMiddleware } from 'http-proxy-middleware';
@@ -20,6 +21,15 @@ const FRONTEND_PORT = process.env.FRONTEND_PORT ? Number(process.env.FRONTEND_PO
 const BASE_PATH = (process.env.BASE_PATH || '').replace(/\/$/, '');
 const JWT_SECRET = process.env.JWT_SECRET || 'change-me-in-production';
 const clientDist = path.join(__dirname, '..', 'client', 'dist');
+
+// Fail fast if frontend build is missing (common cause of "white screen" in Docker)
+const indexPath = path.join(clientDist, 'index.html');
+if (!fs.existsSync(clientDist) || !fs.existsSync(indexPath)) {
+  console.error('ERROR: Frontend build not found at', clientDist);
+  console.error('Expected index.html at', indexPath);
+  console.error('Rebuild the Docker image so the client is built: docker build --no-cache -t whats .');
+  process.exit(1);
+}
 
 const app = express();
 const httpServer = createServer(app);
@@ -53,20 +63,22 @@ app.use(express.json());
 
 const router = express.Router();
 
-router.get('/', (req, res) => {
-  const prefix = BASE_PATH || '';
-  res.json({
-    app: 'Comunitree',
-    docs: 'See README for API usage',
-    endpoints: {
-      health: `${prefix}/health`,
-      auth: `${prefix}/auth/register, ${prefix}/auth/login, ${prefix}/auth/me`,
-      users: `${prefix}/users/:id, ${prefix}/users/me, ...`,
-      communities: `${prefix}/communities`,
-      events: `${prefix}/events, ${prefix}/communities/:id/events`,
-    },
+// When BASE_PATH is set, SPA is served at BASE_PATH/ so don't register API root there
+if (!BASE_PATH) {
+  router.get('/', (req, res) => {
+    res.json({
+      app: 'Comunitree',
+      docs: 'See README for API usage',
+      endpoints: {
+        health: '/health',
+        auth: '/auth/register, /auth/login, /auth/me',
+        users: '/users/:id, /users/me, ...',
+        communities: '/communities',
+        events: '/events, /communities/:id/events',
+      },
+    });
   });
-});
+}
 
 router.get('/health', (req, res) => {
   res.json({ status: 'ok', app: 'Comunitree' });
@@ -84,31 +96,45 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Internal server error' });
 });
 
-// Single-port mode: serve frontend from same server
-function serveFrontendFromBackend() {
-  app.use(express.static(clientDist));
-  app.get('*', (req, res) => {
+// Mount frontend static + SPA fallback at a path ('' means root)
+function mountFrontend(at) {
+  const mount = at || '/';
+  app.use(mount, express.static(clientDist));
+  app.get(mount === '/' ? '*' : `${mount}/*`, (req, res) => {
     res.sendFile(path.join(clientDist, 'index.html'));
   });
+}
+
+// Single-port mode: serve frontend from same server
+function serveFrontendFromBackend() {
+  mountFrontend(BASE_PATH || '/');
+}
+
+function addProxyRoutes(frontendApp, backendOrigin) {
+  const prefix = BASE_PATH || '';
+  const p = (path) => (prefix ? prefix + path : path);
+  frontendApp.use(p('/auth'), createProxyMiddleware({ target: backendOrigin, changeOrigin: true }));
+  frontendApp.use(p('/users'), createProxyMiddleware({ target: backendOrigin, changeOrigin: true }));
+  frontendApp.use(p('/communities'), createProxyMiddleware({ target: backendOrigin, changeOrigin: true }));
+  frontendApp.use(p('/events'), createProxyMiddleware({ target: backendOrigin, changeOrigin: true }));
+  frontendApp.use(p('/health'), createProxyMiddleware({ target: backendOrigin, changeOrigin: true }));
+  frontendApp.use(p('/socket.io'), createProxyMiddleware({ target: backendOrigin, changeOrigin: true, ws: true }));
 }
 
 if (FRONTEND_PORT) {
   // Two-port mode: backend on PORT (7000), frontend on FRONTEND_PORT (8000) with proxy
   const backendOrigin = `http://127.0.0.1:${PORT}`;
   const frontendApp = express();
-  frontendApp.use('/auth', createProxyMiddleware({ target: backendOrigin, changeOrigin: true }));
-  frontendApp.use('/users', createProxyMiddleware({ target: backendOrigin, changeOrigin: true }));
-  frontendApp.use('/communities', createProxyMiddleware({ target: backendOrigin, changeOrigin: true }));
-  frontendApp.use('/events', createProxyMiddleware({ target: backendOrigin, changeOrigin: true }));
-  frontendApp.use('/health', createProxyMiddleware({ target: backendOrigin, changeOrigin: true }));
-  frontendApp.use('/socket.io', createProxyMiddleware({ target: backendOrigin, changeOrigin: true, ws: true }));
-  frontendApp.use(express.static(clientDist));
-  frontendApp.get('*', (req, res) => {
+  addProxyRoutes(frontendApp, backendOrigin);
+  const mount = BASE_PATH || '/';
+  frontendApp.use(mount, express.static(clientDist));
+  frontendApp.get(mount === '/' ? '*' : `${mount}/*`, (req, res) => {
     res.sendFile(path.join(clientDist, 'index.html'));
   });
   const frontendServer = createServer(frontendApp);
   frontendServer.listen(FRONTEND_PORT, () => {
-    console.log(`Comunitree frontend running on http://localhost:${FRONTEND_PORT}`);
+    const pathHint = BASE_PATH ? ` at ${BASE_PATH}` : '';
+    console.log(`Comunitree frontend running on http://localhost:${FRONTEND_PORT}${pathHint}`);
   }).on('error', (err) => {
     console.error('Failed to start frontend server:', err);
     process.exit(1);

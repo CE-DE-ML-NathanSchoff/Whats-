@@ -1,4 +1,5 @@
-const API_BASE = '';
+// Match Vite base so API calls work when app is at e.g. /communitree/
+const API_BASE = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
 
 function getToken() {
   return localStorage.getItem('ct_token');

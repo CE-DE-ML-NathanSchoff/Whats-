@@ -177,7 +177,11 @@ The frontend in `client/` is a React 19 app with Vite 7, Tailwind CSS, Framer Mo
 
 ## Docker
 
-The app listens on **port 8000**. The Docker image builds both the client and server and serves the built frontend from the same process.
+The container exposes **port 8000** (frontend + API proxy) and **port 7000** (API only). **Open http://localhost:8000 in your browser** for the app. Opening port 7000 shows the raw API (JSON), not the website.
+
+The image builds both the client and server and serves the built frontend on port 8000.
+
+**White screen?** Use http://localhost:8000 (not :7000). If the frontend was added after the image was built, rebuild: `docker build --no-cache -t comunitree .`
 
 ### Build locally
 
@@ -259,7 +263,7 @@ The container includes a `HEALTHCHECK`; verify with `docker ps` (look for `(heal
 
 Point the proxy at `localhost:8000` (or the VM's IP and port 8000). The container serves both the API and the frontend SPA.
 
-If the app is served at a subpath (e.g. `https://example.com/communitree/`), set `BASE_PATH=/communitree` in `.env` and configure the proxy to forward or strip the prefix accordingly.
+If the app is served at a subpath (e.g. `https://example.com/communitree/`), set `BASE_PATH=/communitree` in `.env` (the image defaults to this). The proxy must forward the full path (e.g. `/communitree` and `/communitree/assets/...`) to the container so asset requests don’t 404.
 
 TLS termination is handled by the proxy; the container stays HTTP on port 8000.
 
