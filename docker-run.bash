@@ -186,37 +186,36 @@ if [ "$RUN_INIT_DB" = "1" ]; then
   echo "Running one-time DB init (Snowflake schema)..."
   echo "With key-pair (default): you will be prompted for your MFA code once; init-db generates a key pair, registers it with Snowflake, and saves the private key to .env."
 
-  # Use a temporary volume so init.js has a writable path for the key file
-  TEMP_VOL="comunitree_init_tmp_$$"
-  TEMP_KEY_PATH="/tmp_keys/snowflake_rsa_key.p8"
-  docker volume create "$TEMP_VOL" >/dev/null 2>&1 || true
-  docker run --rm -v "${TEMP_VOL}:/tmp_keys" "$IMAGE" sh -c 'mkdir -p /tmp_keys && chmod 777 /tmp_keys' 2>/dev/null || true
+  # Bind-mount SCRIPT_DIR into the container so init.js writes the .p8 file directly to the host
+  TEMP_KEY_FILE="${SCRIPT_DIR}/.snowflake_rsa_key_tmp.p8"
+  CONTAINER_MOUNT="/host_env"
+  CONTAINER_KEY_PATH="${CONTAINER_MOUNT}/.snowflake_rsa_key_tmp.p8"
+  rm -f "$TEMP_KEY_FILE" 2>/dev/null || true
 
   set +e
   docker run -it --rm \
-    -v "${TEMP_VOL}:/tmp_keys" \
+    -v "${SCRIPT_DIR}:${CONTAINER_MOUNT}" \
     --env-file "$ENV_FILE" \
-    -e SNOWFLAKE_PRIVATE_KEY_PATH="$TEMP_KEY_PATH" \
+    -e SNOWFLAKE_PRIVATE_KEY_PATH="$CONTAINER_KEY_PATH" \
     "$IMAGE" node server/db/init.js
   INIT_RET=$?
   set -e
 
   if [ "$INIT_RET" -ne 0 ]; then
-    docker volume rm "$TEMP_VOL" >/dev/null 2>&1 || true
+    rm -f "$TEMP_KEY_FILE" 2>/dev/null || true
     dbg_log "step_failed" "\"step\":4,\"error\":\"init-db exited with code $INIT_RET\""
     echo "DB init failed (exit code $INIT_RET). Fix .env (Snowflake credentials or MFA) and run again with --init-db." >&2
     exit 1
   fi
 
-  # Extract the generated key from the temp volume, inject into .env, then discard the volume
-  KEY_PEM=$(docker run --rm -v "${TEMP_VOL}:/tmp_keys" "$IMAGE" cat "$TEMP_KEY_PATH" 2>/dev/null || true)
-  docker volume rm "$TEMP_VOL" >/dev/null 2>&1 || true
-
-  if [ -n "$KEY_PEM" ]; then
+  # Read the key file from the host, inject into .env, then delete the temp file
+  if [ -f "$TEMP_KEY_FILE" ]; then
+    KEY_PEM=$(cat "$TEMP_KEY_FILE")
+    rm -f "$TEMP_KEY_FILE"
     inject_key_into_env "$KEY_PEM"
-    echo "DB init completed. Key saved to .env — no Docker volume needed at runtime."
+    echo "DB init completed. Key saved to .env."
   else
-    echo "DB init completed but could not extract the private key from the container." >&2
+    echo "DB init completed but no new key file was written." >&2
     echo "  If key-pair auth was already set up, the existing SNOWFLAKE_PRIVATE_KEY in .env will be used." >&2
   fi
 fi
