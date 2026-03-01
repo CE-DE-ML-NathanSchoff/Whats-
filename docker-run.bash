@@ -108,8 +108,8 @@ if [ "$need_env_prompt" = "1" ]; then
   echo "Comunitree needs the following configuration. Values are written to .env."
   echo ""
 
-  JWT_SECRET=$(prompt_value "JWT_SECRET (long random string, e.g. run: openssl rand -hex 32)" 1)
-  [ -z "$JWT_SECRET" ] && echo "JWT_SECRET is required." >&2 && exit 1
+  JWT_SECRET=$(openssl rand -hex 32)
+  echo "Generated JWT_SECRET (openssl rand -hex 32)."
 
   echo ""
   echo "--- Snowflake (get these from your Snowflake account / UI) ---"
