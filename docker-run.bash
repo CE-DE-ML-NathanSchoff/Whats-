@@ -164,7 +164,8 @@ if [ "$RUN_INIT_DB" = "1" ]; then
   # #endregion
   debug "Step 4a: Running Snowflake schema init"
   echo "Running one-time DB init (Snowflake schema)..."
-  INIT_ERR=$(docker run --rm --env-file "$ENV_FILE" "$IMAGE" node server/db/init.js 2>&1); INIT_RET=$?
+  echo "If MFA is required and SNOWFLAKE_PASSCODE is not set, you will be prompted for the 6-digit code."
+  INIT_ERR=$(docker run -it --rm --env-file "$ENV_FILE" "$IMAGE" node server/db/init.js 2>&1); INIT_RET=$?
   if [ "$INIT_RET" -ne 0 ]; then
     dbg_log "step_failed" "\"step\":4,\"error\":\"$(sanitize_err "$INIT_ERR")\""
     echo "DB init failed. Fix .env (e.g. Snowflake credentials, MFA passcode) and run again with --init-db." >&2
