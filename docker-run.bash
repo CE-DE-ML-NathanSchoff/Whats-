@@ -1,10 +1,13 @@
-#!/bin/sh
-# POSIX-compliant: run with sh or bash. For debug output use DEBUG=1 ./docker-run.bash
+#!/usr/bin/env sh
+# Run from script dir: ./docker-run.bash (or: sh docker-run.bash if permission denied).
+# Debug: DEBUG=1 ./docker-run.bash
 set -e
 
 IMAGE="${IMAGE:-ghcr.io/ce-de-ml-nathanschoff/whats:backend-docker}"
 PORT="${PORT:-8000}"
 CONTAINER_NAME="${CONTAINER_NAME:-comunitree-backend}"
+FOREGROUND=0
+[ "$1" = "--foreground" ] && FOREGROUND=1 && shift
 
 debug() { [ -n "$DEBUG" ] && echo "[DEBUG] $*" >&2; }
 
@@ -57,10 +60,29 @@ fi
 
 # --- Step 5: Run container ---
 debug "Step 5: Running container"
-if [ -f .env ]; then
-  debug "Command: docker run -p ${PORT}:8000 --name $CONTAINER_NAME --env-file .env $* $IMAGE"
-  exec docker run -p "${PORT}:8000" --name "$CONTAINER_NAME" --env-file .env "$@" "$IMAGE"
-else
-  debug "Command: docker run -p ${PORT}:8000 --name $CONTAINER_NAME $* $IMAGE"
-  exec docker run -p "${PORT}:8000" --name "$CONTAINER_NAME" "$@" "$IMAGE"
+DETACH=""
+[ "$FOREGROUND" = "0" ] && DETACH="-d"
+
+_run() {
+  if [ -f .env ]; then
+    docker run $DETACH -p "${PORT}:8000" --name "$CONTAINER_NAME" --env-file .env "$@" "$IMAGE"
+  else
+    docker run $DETACH -p "${PORT}:8000" --name "$CONTAINER_NAME" "$@" "$IMAGE"
+  fi
+}
+
+if [ "$FOREGROUND" = "1" ]; then
+  debug "Command: docker run -p ${PORT}:8000 --name $CONTAINER_NAME ... (foreground)"
+  if [ -f .env ]; then
+    exec docker run -p "${PORT}:8000" --name "$CONTAINER_NAME" --env-file .env "$@" "$IMAGE"
+  else
+    exec docker run -p "${PORT}:8000" --name "$CONTAINER_NAME" "$@" "$IMAGE"
+  fi
 fi
+
+_run "$@"
+echo ""
+echo "Container '$CONTAINER_NAME' is running in the background on port $PORT."
+echo "  Logs:  docker logs -f $CONTAINER_NAME"
+echo "  Stop:  docker stop $CONTAINER_NAME"
+echo "  Run attached (Ctrl+C to stop):  ./docker-run.bash --foreground"

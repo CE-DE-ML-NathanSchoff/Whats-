@@ -8,32 +8,38 @@ import eventRoutes from './routes/events.js';
 
 const app = express();
 const PORT = process.env.PORT || 8000;
+const BASE_PATH = (process.env.BASE_PATH || '').replace(/\/$/, ''); // e.g. '' or '/communitree'
 
 app.use(cors());
 app.use(express.json());
 
-app.get('/', (req, res) => {
+const router = express.Router();
+
+router.get('/', (req, res) => {
+  const prefix = BASE_PATH || '';
   res.json({
     app: 'Comunitree',
     docs: 'See README for API usage',
     endpoints: {
-      health: '/health',
-      auth: '/auth/register, /auth/login, /auth/me',
-      users: '/users/:id, /users/me, /users/me/config, /users/me/avatar, /users/me/locations, /users/me/events, /users/me/ratings, /users/me/friends, ...',
-      communities: '/communities',
-      events: '/events, /communities/:id/events',
+      health: `${prefix}/health`,
+      auth: `${prefix}/auth/register, ${prefix}/auth/login, ${prefix}/auth/me`,
+      users: `${prefix}/users/:id, ${prefix}/users/me, ...`,
+      communities: `${prefix}/communities`,
+      events: `${prefix}/events, ${prefix}/communities/:id/events`,
     },
   });
 });
 
-app.get('/health', (req, res) => {
+router.get('/health', (req, res) => {
   res.json({ status: 'ok', app: 'Comunitree' });
 });
 
-app.use('/auth', authRoutes);
-app.use('/users', userRoutes);
-app.use('/communities', communityRoutes);
-app.use('/events', eventRoutes);
+router.use('/auth', authRoutes);
+router.use('/users', userRoutes);
+router.use('/communities', communityRoutes);
+router.use('/events', eventRoutes);
+
+app.use(BASE_PATH || '/', router);
 
 app.use((err, req, res, next) => {
   console.error(err);
