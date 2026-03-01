@@ -157,6 +157,53 @@ if [ "$PULL_RET" -ne 0 ]; then
   exit 1
 fi
 
+# --- Step 3.5: Ensure key volume directory and permissions ---
+KEY_VOLUME="${KEY_VOLUME:-comunitree_snowflake_keys}"
+KEY_PATH="/secrets/snowflake_rsa_key.p8"
+
+ensure_secrets_volume() {
+  debug "Ensuring /secrets dir exists with correct permissions in volume ${KEY_VOLUME}"
+  docker volume create "$KEY_VOLUME" >/dev/null 2>&1 || true
+  docker run --rm -v "${KEY_VOLUME}:/secrets" "$IMAGE" sh -c \
+    'mkdir -p /secrets && chmod 777 /secrets' 2>/dev/null || true
+}
+
+fix_key_permissions() {
+  debug "Fixing permissions on $KEY_PATH inside volume ${KEY_VOLUME}"
+  docker run --rm -v "${KEY_VOLUME}:/secrets" "$IMAGE" sh -c \
+    "[ -f $KEY_PATH ] && chmod 644 $KEY_PATH || true" 2>/dev/null || true
+}
+
+verify_key_readable() {
+  debug "Verifying $KEY_PATH exists and is readable"
+  local check
+  check=$(docker run --rm -v "${KEY_VOLUME}:/secrets" "$IMAGE" sh -c \
+    "if [ ! -f $KEY_PATH ]; then echo MISSING; elif [ ! -r $KEY_PATH ]; then echo UNREADABLE; else echo OK; fi" 2>&1)
+  case "$check" in
+    MISSING)
+      echo "Warning: $KEY_PATH does not exist in volume '${KEY_VOLUME}'." >&2
+      echo "  Run with --init-db to generate the Snowflake key pair." >&2
+      return 1 ;;
+    UNREADABLE)
+      echo "Warning: $KEY_PATH exists but is not readable. Attempting to fix permissions..." >&2
+      fix_key_permissions
+      local recheck
+      recheck=$(docker run --rm -v "${KEY_VOLUME}:/secrets" "$IMAGE" sh -c \
+        "[ -r $KEY_PATH ] && echo OK || echo FAIL" 2>&1)
+      if [ "$recheck" != "OK" ]; then
+        echo "Error: Could not fix permissions on $KEY_PATH." >&2
+        echo "  Try manually: docker run --rm -v ${KEY_VOLUME}:/secrets alpine chmod 644 $KEY_PATH" >&2
+        return 1
+      fi
+      echo "Permissions fixed." ;;
+    OK) debug "Key file is present and readable." ;;
+    *)
+      echo "Warning: Could not verify key file (volume may not exist yet). Output: $check" >&2
+      return 1 ;;
+  esac
+  return 0
+}
+
 # --- Step 4: Optional DB init ---
 if [ "$RUN_INIT_DB" = "1" ]; then
   # #region agent log
@@ -165,9 +212,9 @@ if [ "$RUN_INIT_DB" = "1" ]; then
   debug "Step 4a: Running Snowflake schema init"
   echo "Running one-time DB init (Snowflake schema)..."
   echo "With key-pair (default): you will be prompted for your MFA code once; init-db creates a key and writes it to a volume so the app can use it 24/7."
-  KEY_VOLUME="${KEY_VOLUME:-comunitree_snowflake_keys}"
+  ensure_secrets_volume
   set +e
-  docker run -it --rm -v "${KEY_VOLUME}:/secrets" --env-file "$ENV_FILE" -e SNOWFLAKE_PRIVATE_KEY_PATH=/secrets/snowflake_rsa_key.p8 "$IMAGE" node server/db/init.js
+  docker run -it --rm -v "${KEY_VOLUME}:/secrets" --env-file "$ENV_FILE" -e SNOWFLAKE_PRIVATE_KEY_PATH="$KEY_PATH" "$IMAGE" node server/db/init.js
   INIT_RET=$?
   set -e
   if [ "$INIT_RET" -ne 0 ]; then
@@ -175,7 +222,12 @@ if [ "$RUN_INIT_DB" = "1" ]; then
     echo "DB init failed (exit code $INIT_RET). Fix .env (Snowflake credentials, key path, or MFA) and run again with --init-db." >&2
     exit 1
   fi
-  echo "DB init completed."
+  fix_key_permissions
+  if verify_key_readable; then
+    echo "DB init completed. Key written and verified."
+  else
+    echo "DB init completed but key verification failed. The app may not start correctly." >&2
+  fi
 fi
 
 # --- Step 5: Optional migrations ---
@@ -208,10 +260,15 @@ debug "Step 7: Running container"
 DETACH="-d"
 [ "$FOREGROUND" = "1" ] && DETACH=""
 
-KEY_VOLUME="${KEY_VOLUME:-comunitree_snowflake_keys}"
 KEY_ENV=""
 if grep -q 'SNOWFLAKE_AUTHENTICATOR=SNOWFLAKE_JWT' "$ENV_FILE" 2>/dev/null; then
-  KEY_ENV="-v ${KEY_VOLUME}:/secrets -e SNOWFLAKE_PRIVATE_KEY_PATH=/secrets/snowflake_rsa_key.p8"
+  KEY_ENV="-v ${KEY_VOLUME}:/secrets -e SNOWFLAKE_PRIVATE_KEY_PATH=${KEY_PATH}"
+  ensure_secrets_volume
+  if ! verify_key_readable; then
+    echo "Error: Cannot start — Snowflake JWT auth is configured but the private key is missing or unreadable." >&2
+    echo "  Run:  ./docker-run.bash --init-db   to generate the key first." >&2
+    exit 1
+  fi
 fi
 echo "Starting Comunitree (frontend $PORT, backend 7000)..."
 if [ "$FOREGROUND" = "1" ]; then
