@@ -2,6 +2,18 @@ import { useEffect, useRef, useState } from 'react'
 import { Marker } from '@vis.gl/react-maplibre'
 import { motion, AnimatePresence } from 'framer-motion'
 import OakConfetti from '../UI/OakConfetti'
+import seedImg   from '../../assets/stages/seed.png'
+import sproutImg from '../../assets/stages/sprout.png'
+import treeImg   from '../../assets/stages/tree.png'
+import oakImg    from '../../assets/stages/oak.png'
+
+const stageImages = {
+  seed:    seedImg,
+  sprout:  sproutImg,
+  sapling: sproutImg,  // no dedicated sapling art — use sprout
+  tree:    treeImg,
+  oak:     oakImg,
+}
 
 // ─── Fallen tree helpers (exported for reuse in PostCard, MapPage) ─────────────
 
@@ -36,11 +48,11 @@ export const isDecayed = (post) => {
 const BASE_SIZE = 28
 
 const stageVariants = {
-  seed: { scale: 0.35, opacity: 0.5, backgroundColor: '#6B7280' },
-  sprout: { scale: 0.55, opacity: 0.75, backgroundColor: '#74C69D' },
-  sapling: { scale: 0.75, opacity: 0.88, backgroundColor: '#52B788' },
-  tree: { scale: 1.0, opacity: 1.0, backgroundColor: '#2D6A4F' },
-  oak: { scale: 1.25, opacity: 1.0, backgroundColor: '#FFD700' },
+  seed:    { scale: 0.35, opacity: 0.5 },
+  sprout:  { scale: 0.55, opacity: 0.75 },
+  sapling: { scale: 0.75, opacity: 0.88 },
+  tree:    { scale: 1.0,  opacity: 1.0 },
+  oak:     { scale: 1.25, opacity: 1.0 },
 }
 
 const OAK_RING = {
@@ -322,20 +334,26 @@ export default function SeedMarker({ post, onSelect }) {
             />
           )}
 
-          {/* ── Main node — spring growth + color transition ── */}
-          <motion.div
-            className="absolute rounded-full"
+          {/* ── Main node — pixel art image per stage ── */}
+          <motion.img
+            src={stageImages[stage] || seedImg}
+            alt={stage}
+            className="absolute"
             style={{
               inset: 0,
+              width: '100%',
+              height: '100%',
+              imageRendering: 'pixelated',
+              objectFit: 'contain',
               filter: decayed ? 'grayscale(1)' : fallen ? 'grayscale(0.7) sepia(0.3)' : undefined,
             }}
             variants={stageVariants}
             initial="seed"
             animate={
               decayed
-                ? { scale: 0.4, opacity: 0.15, backgroundColor: '#2a1f1a' }
+                ? { scale: 0.4, opacity: 0.15 }
                 : fallen
-                ? { scale: 0.7, opacity: 0.4, backgroundColor: '#4a3728' }
+                ? { scale: 0.7, opacity: 0.4 }
                 : stage
             }
             transition={
