@@ -89,7 +89,12 @@ router.use('/users', userRoutes);
 router.use('/communities', communityRoutes);
 router.use('/events', eventRoutes);
 
+// Mount API at BASE_PATH (e.g. /communitree) so frontend built with that base works
 app.use(BASE_PATH || '/', router);
+// When BASE_PATH is set, also mount at root so /auth, /users etc. work (avoids 404 if client hits root path)
+if (BASE_PATH) {
+  app.use('/', router);
+}
 
 app.use((err, req, res, next) => {
   console.error(err);
@@ -125,6 +130,16 @@ if (FRONTEND_PORT) {
   // Two-port mode: backend on PORT (7000), frontend on FRONTEND_PORT (8000) with proxy
   const backendOrigin = `http://127.0.0.1:${PORT}`;
   const frontendApp = express();
+  // When BASE_PATH is set, redirect / to /communitree/ so users get the app instead of 404
+  if (BASE_PATH) {
+    frontendApp.get('/', (req, res) => res.redirect(302, BASE_PATH + '/'));
+    frontendApp.use('/auth', createProxyMiddleware({ target: backendOrigin, changeOrigin: true }));
+    frontendApp.use('/users', createProxyMiddleware({ target: backendOrigin, changeOrigin: true }));
+    frontendApp.use('/communities', createProxyMiddleware({ target: backendOrigin, changeOrigin: true }));
+    frontendApp.use('/events', createProxyMiddleware({ target: backendOrigin, changeOrigin: true }));
+    frontendApp.use('/health', createProxyMiddleware({ target: backendOrigin, changeOrigin: true }));
+    frontendApp.use('/socket.io', createProxyMiddleware({ target: backendOrigin, changeOrigin: true, ws: true }));
+  }
   addProxyRoutes(frontendApp, backendOrigin);
   const mount = BASE_PATH || '/';
   frontendApp.use(mount, express.static(clientDist));
