@@ -1,27 +1,16 @@
-#!/usr/bin/env bash
-# Requires Bash (for arrays). Re-exec with bash if run via sh.
-[ -z "$BASH_VERSION" ] && exec bash "$0" "$@"
-
+#!/bin/sh
+# POSIX-compliant: run with sh or bash. For debug output use DEBUG=1 ./docker-run.bash
 set -e
 
 IMAGE="${IMAGE:-ghcr.io/ce-de-ml-nathanschoff/whats:backend-docker}"
 PORT="${PORT:-8000}"
 CONTAINER_NAME="${CONTAINER_NAME:-comunitree-backend}"
 
-# Debug: print when DEBUG=1 or --debug is in args
 debug() { [ -n "$DEBUG" ] && echo "[DEBUG] $*" >&2; }
-DOCKER_RUN_EXTRA=()
-for arg in "$@"; do
-  if [ "$arg" = "--debug" ]; then
-    DEBUG=1
-  else
-    DOCKER_RUN_EXTRA+=("$arg")
-  fi
-done
 
 # --- Step 1: Check Docker ---
 debug "Step 1: Checking Docker availability"
-if ! command -v docker &>/dev/null; then
+if ! command -v docker >/dev/null 2>&1; then
   echo "Error: docker is not installed or not in PATH." >&2
   exit 1
 fi
@@ -69,10 +58,9 @@ fi
 # --- Step 5: Run container ---
 debug "Step 5: Running container"
 if [ -f .env ]; then
-  RUN_CMD=(docker run -p "${PORT}:8000" --name "$CONTAINER_NAME" --env-file .env "${DOCKER_RUN_EXTRA[@]}" "$IMAGE")
+  debug "Command: docker run -p ${PORT}:8000 --name $CONTAINER_NAME --env-file .env $* $IMAGE"
+  exec docker run -p "${PORT}:8000" --name "$CONTAINER_NAME" --env-file .env "$@" "$IMAGE"
 else
-  RUN_CMD=(docker run -p "${PORT}:8000" --name "$CONTAINER_NAME" "${DOCKER_RUN_EXTRA[@]}" "$IMAGE")
+  debug "Command: docker run -p ${PORT}:8000 --name $CONTAINER_NAME $* $IMAGE"
+  exec docker run -p "${PORT}:8000" --name "$CONTAINER_NAME" "$@" "$IMAGE"
 fi
-debug "Command: ${RUN_CMD[*]}"
-
-exec "${RUN_CMD[@]}"
