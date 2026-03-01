@@ -405,23 +405,16 @@ router.patch(
 router.post(
   '/me/avatar',
   requireAuth,
-  [
-    body('url').optional().trim().isLength({ max: 500 }),
-    body('use_random_color').optional().isBoolean(),
-  ],
+  [body('url').optional().trim().isLength({ max: 500 })],
   async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({ errors: errors.array() });
     }
     try {
-      const { url, use_random_color } = req.body;
-      let user;
-      if (url != null && String(url).trim() !== '') {
-        user = await userService.setAvatarUrl(req.user.id, String(url).trim());
-      } else {
-        user = await userService.setRandomAvatarColor(req.user.id);
-      }
+      const { url } = req.body;
+      const trimmed = url != null ? String(url).trim() : '';
+      const user = await userService.setAvatarUrl(req.user.id, trimmed || null);
       return res.json(user);
     } catch (err) {
       console.error('Set avatar error:', err);

@@ -44,7 +44,6 @@ export async function getPublicProfile(profileUserId, viewerId) {
       id: user.id,
       username: user.username,
       avatar_url: user.avatar_url ?? null,
-      avatar_color: user.avatar_color ?? null,
     };
   }
 
@@ -54,7 +53,6 @@ export async function getPublicProfile(profileUserId, viewerId) {
     display_name: user.display_name ?? null,
     bio: user.bio ?? null,
     avatar_url: user.avatar_url ?? null,
-    avatar_color: user.avatar_color ?? null,
     location: privacy.show_location !== false ? (user.location ?? null) : null,
     created_at: user.created_at,
   };

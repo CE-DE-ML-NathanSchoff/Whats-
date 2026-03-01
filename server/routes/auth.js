@@ -81,7 +81,6 @@ router.post('/register', registerValidators, async (req, res) => {
         display_name: user.display_name,
         bio: user.bio,
         avatar_url: user.avatar_url,
-        avatar_color: user.avatar_color,
         location: user.location,
         created_at: user.created_at,
       },
@@ -135,7 +134,6 @@ router.post('/login', loginValidators, async (req, res) => {
       display_name: user.DISPLAY_NAME ?? user.display_name,
       bio: user.BIO ?? user.bio,
       avatar_url: user.AVATAR_URL ?? user.avatar_url ?? null,
-      avatar_color: user.AVATAR_COLOR ?? user.avatar_color ?? null,
       location: user.LOCATION ?? user.location ?? null,
       created_at: user.CREATED_AT || user.created_at,
     };
