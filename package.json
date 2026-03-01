@@ -9,6 +9,7 @@
     "dev": "node --watch src/index.js",
     "init-db": "node src/db/init.js",
     "migrate-private-friends": "node src/db/migratePrivateAndFriends.js",
+    "migrate-profile-config": "node src/db/migrateProfileAndConfig.js",
     "seed-locations": "node src/db/seedLocations.js"
   },
   "keywords": ["comunitree", "snowflake", "express"],

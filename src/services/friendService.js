@@ -190,6 +190,18 @@ export async function listFriends(userId) {
 }
 
 /**
+ * Check if two users are friends (accepted friendship).
+ * @param {string} userId
+ * @param {string} otherUserId
+ * @returns {Promise<boolean>}
+ */
+export async function areFriends(userId, otherUserId) {
+  if (userId === otherUserId) return true;
+  const friends = await listFriends(userId);
+  return friends.some((f) => (f.user_id || f.USER_ID) === otherUserId);
+}
+
+/**
  * Remove a friend: remove from both users' friend communities (symmetric) and update/delete friendship.
  * @param {string} userId - current user
  * @param {string} friendUserId - friend to remove

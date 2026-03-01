@@ -4,6 +4,7 @@ import cors from 'cors';
 import authRoutes from './routes/auth.js';
 import userRoutes from './routes/users.js';
 import communityRoutes from './routes/communities.js';
+import eventRoutes from './routes/events.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -18,8 +19,9 @@ app.get('/', (req, res) => {
     endpoints: {
       health: '/health',
       auth: '/auth/register, /auth/login, /auth/me',
-      users: '/users/:id, /users/me',
+      users: '/users/:id, /users/me, /users/me/config, /users/me/avatar, /users/me/locations, /users/me/events, /users/me/ratings, /users/me/friends, ...',
       communities: '/communities',
+      events: '/events, /communities/:id/events',
     },
   });
 });
@@ -31,6 +33,7 @@ app.get('/health', (req, res) => {
 app.use('/auth', authRoutes);
 app.use('/users', userRoutes);
 app.use('/communities', communityRoutes);
+app.use('/events', eventRoutes);
 
 app.use((err, req, res, next) => {
   console.error(err);

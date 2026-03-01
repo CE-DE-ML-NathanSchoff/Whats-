@@ -17,6 +17,8 @@ function rowToUser(row) {
   const display_name = row.DISPLAY_NAME ?? row.display_name;
   const bio = row.BIO ?? row.bio;
   const avatar_url = row.AVATAR_URL ?? row.avatar_url;
+  const avatar_color = row.AVATAR_COLOR ?? row.avatar_color;
+  const location = row.LOCATION ?? row.location;
   const is_active = row.IS_ACTIVE ?? row.is_active;
   const created_at = row.CREATED_AT ?? row.created_at;
   const updated_at = row.UPDATED_AT ?? row.updated_at;
@@ -28,10 +30,20 @@ function rowToUser(row) {
     display_name: display_name ?? null,
     bio: bio ?? null,
     avatar_url: avatar_url ?? null,
+    avatar_color: avatar_color ?? null,
+    location: location ?? null,
     is_active: is_active ?? true,
     created_at,
     updated_at,
   };
+}
+
+/** Generate a random hex color (e.g. #3B82F6) for avatar placeholder. */
+function randomAvatarColor() {
+  const hex = Math.floor(Math.random() * 0xffffff)
+    .toString(16)
+    .padStart(6, '0');
+  return `#${hex}`;
 }
 
 /**
@@ -43,9 +55,10 @@ export async function createUser(data) {
   const { username, email, password, phone_number, display_name, bio } = data;
   const password_hash = await bcrypt.hash(password, SALT_ROUNDS);
 
+  const avatar_color = randomAvatarColor();
   const sql = `
-    INSERT INTO users (username, email, phone_number, password_hash, display_name, bio)
-    VALUES (?, ?, ?, ?, ?, ?)
+    INSERT INTO users (username, email, phone_number, password_hash, display_name, bio, avatar_color)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
   `;
   await execute(sql, [
     username,
@@ -54,10 +67,11 @@ export async function createUser(data) {
     password_hash,
     display_name || null,
     bio || null,
+    avatar_color,
   ]);
 
   const rows = await query(
-    'SELECT id, username, email, phone_number, display_name, bio, created_at FROM users WHERE username = ?',
+    'SELECT id, username, email, phone_number, display_name, bio, avatar_url, avatar_color, location, created_at FROM users WHERE username = ?',
     [username]
   );
   const row = rows[0];
@@ -97,7 +111,7 @@ export async function findByEmail(email) {
  */
 export async function findById(id) {
   const rows = await query(
-    'SELECT id, username, email, phone_number, display_name, bio, avatar_url, is_active, created_at, updated_at FROM users WHERE id = ?',
+    'SELECT id, username, email, phone_number, display_name, bio, avatar_url, avatar_color, location, is_active, created_at, updated_at FROM users WHERE id = ?',
     [id]
   );
   return rows[0] ? rowToUser(rows[0]) : null;
@@ -116,11 +130,11 @@ export async function verifyPassword(plainPassword, passwordHash) {
 /**
  * Update user profile fields (optional fields).
  * @param {string} userId
- * @param {{ display_name?: string, bio?: string, avatar_url?: string, phone_number?: string }} updates
+ * @param {{ display_name?: string, bio?: string, avatar_url?: string, phone_number?: string, location?: string }} updates
  * @returns {Promise<object | null>}
  */
 export async function updateUser(userId, updates) {
-  const allowed = ['display_name', 'bio', 'avatar_url', 'phone_number'];
+  const allowed = ['display_name', 'bio', 'avatar_url', 'phone_number', 'location'];
   const setClauses = [];
   const values = [];
   for (const [key, value] of Object.entries(updates)) {
@@ -134,5 +148,33 @@ export async function updateUser(userId, updates) {
   values.push(userId);
   const sql = `UPDATE users SET ${setClauses.join(', ')} WHERE id = ?`;
   await execute(sql, values);
+  return findById(userId);
+}
+
+/**
+ * Set user's avatar to a new random solid color (clears avatar_url).
+ * @param {string} userId
+ * @returns {Promise<object | null>}
+ */
+export async function setRandomAvatarColor(userId) {
+  const color = randomAvatarColor();
+  await execute(
+    'UPDATE users SET avatar_color = ?, avatar_url = NULL, updated_at = CURRENT_TIMESTAMP() WHERE id = ?',
+    [color, userId]
+  );
+  return findById(userId);
+}
+
+/**
+ * Set user's avatar URL (custom image). Keeps avatar_color as fallback.
+ * @param {string} userId
+ * @param {string} url
+ * @returns {Promise<object | null>}
+ */
+export async function setAvatarUrl(userId, url) {
+  await execute(
+    'UPDATE users SET avatar_url = ?, updated_at = CURRENT_TIMESTAMP() WHERE id = ?',
+    [url || null, userId]
+  );
   return findById(userId);
 }

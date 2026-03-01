@@ -266,6 +266,26 @@ export async function getFriendGroupForUser(userId) {
 }
 
 /**
+ * Get community id plus all descendant public community IDs (for event board: events in this community or any descendant SUB/LOCATION).
+ * @param {string} communityId
+ * @returns {Promise<string[]>}
+ */
+export async function getDescendantPublicCommunityIds(communityId) {
+  const result = [communityId];
+  let current = [communityId];
+  while (current.length > 0) {
+    const placeholders = current.map(() => '?').join(',');
+    const rows = await query(
+      `SELECT id FROM communities WHERE parent_id IN (${placeholders}) AND type IN ('LOCATION', 'SUB') AND is_active = TRUE`,
+      current
+    );
+    current = rows.map((r) => r.ID ?? r.id);
+    result.push(...current);
+  }
+  return result;
+}
+
+/**
  * Create a private community. Caller becomes founder/owner. Optional parent_ids (user must be member of each).
  * @param {string} userId
  * @param {{ name: string, slug: string, description?: string, profile_data?: object, parent_ids?: string[] }} data
@@ -846,6 +866,69 @@ export async function getLocalLocationIds(userId) {
     [userId]
   );
   return rows.map((r) => r.ID ?? r.id);
+}
+
+/**
+ * List location communities the user is a member of (id, name, slug).
+ * @param {string} userId
+ * @returns {Promise<Array<{ id: string, name: string, slug: string }>>}
+ */
+export async function listLocationCommunitiesForUser(userId) {
+  const rows = await query(
+    `SELECT c.id, c.name, c.slug FROM communities c
+     JOIN community_members cm ON cm.community_id = c.id AND cm.user_id = ?
+     WHERE c.type = 'LOCATION' AND c.is_active = TRUE
+     ORDER BY c.name ASC`,
+    [userId]
+  );
+  return rows.map((r) => ({
+    id: r.ID ?? r.id,
+    name: r.NAME ?? r.name,
+    slug: r.SLUG ?? r.slug,
+  }));
+}
+
+/**
+ * Join a LOCATION community (user adds themselves as local to that location).
+ * @param {string} userId
+ * @param {string} communityId
+ */
+export async function joinLocationCommunity(userId, communityId) {
+  const community = await getById(communityId);
+  if (!community) {
+    const err = new Error('Community not found');
+    err.code = 'NOT_FOUND';
+    throw err;
+  }
+  if (community.type !== 'LOCATION') {
+    const err = new Error('Only location communities can be joined as "local"');
+    err.code = 'NOT_LOCATION';
+    throw err;
+  }
+  if (await isMember(userId, communityId)) {
+    return;
+  }
+  await addMember(communityId, userId, 'member');
+}
+
+/**
+ * Leave a LOCATION community (user removes themselves from that location).
+ * @param {string} userId
+ * @param {string} communityId
+ */
+export async function leaveLocationCommunity(userId, communityId) {
+  const community = await getById(communityId);
+  if (!community) {
+    const err = new Error('Community not found');
+    err.code = 'NOT_FOUND';
+    throw err;
+  }
+  if (community.type !== 'LOCATION') {
+    const err = new Error('Only location communities can be left via this endpoint');
+    err.code = 'NOT_LOCATION';
+    throw err;
+  }
+  await removeMemberFromCommunity(communityId, userId);
 }
 
 /**

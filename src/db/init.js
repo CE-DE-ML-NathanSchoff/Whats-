@@ -27,9 +27,21 @@ CREATE TABLE IF NOT EXISTS users (
   display_name VARCHAR(255),
   bio VARCHAR(1000),
   avatar_url VARCHAR(500),
+  avatar_color VARCHAR(7),
+  location VARCHAR(500),
   is_active BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP(),
   updated_at TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
+);
+`;
+
+const USER_CONFIGS_TABLE = `
+CREATE TABLE IF NOT EXISTS user_configs (
+  user_id VARCHAR(36) PRIMARY KEY,
+  gui_settings VARIANT,
+  privacy_settings VARIANT,
+  updated_at TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP(),
+  CONSTRAINT fk_config_user FOREIGN KEY (user_id) REFERENCES users(id)
 );
 `;
 
@@ -104,6 +116,51 @@ CREATE TABLE IF NOT EXISTS friendships (
 );
 `;
 
+const EVENTS_TABLE = `
+CREATE TABLE IF NOT EXISTS events (
+  id VARCHAR(36) DEFAULT UUID_STRING() PRIMARY KEY,
+  community_id VARCHAR(36) NOT NULL,
+  creator_id VARCHAR(36) NOT NULL,
+  title VARCHAR(500) NOT NULL,
+  description VARCHAR(5000),
+  event_date DATE,
+  event_time VARCHAR(50),
+  broad_location VARCHAR(500),
+  specific_location VARCHAR(1000),
+  is_public BOOLEAN DEFAULT TRUE,
+  visibility_settings VARIANT,
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP(),
+  updated_at TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP(),
+  CONSTRAINT fk_event_community FOREIGN KEY (community_id) REFERENCES communities(id),
+  CONSTRAINT fk_event_creator FOREIGN KEY (creator_id) REFERENCES users(id)
+);
+`;
+
+const EVENT_RSVPS_TABLE = `
+CREATE TABLE IF NOT EXISTS event_rsvps (
+  event_id VARCHAR(36) NOT NULL,
+  user_id VARCHAR(36) NOT NULL,
+  created_at TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP(),
+  PRIMARY KEY (event_id, user_id),
+  CONSTRAINT fk_rsvp_event FOREIGN KEY (event_id) REFERENCES events(id),
+  CONSTRAINT fk_rsvp_user FOREIGN KEY (user_id) REFERENCES users(id)
+);
+`;
+
+const EVENT_RATINGS_TABLE = `
+CREATE TABLE IF NOT EXISTS event_ratings (
+  event_id VARCHAR(36) NOT NULL,
+  user_id VARCHAR(36) NOT NULL,
+  rating INT NOT NULL,
+  created_at TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP(),
+  PRIMARY KEY (event_id, user_id),
+  CONSTRAINT chk_rating_range CHECK (rating >= 1 AND rating <= 5),
+  CONSTRAINT fk_rating_event FOREIGN KEY (event_id) REFERENCES events(id),
+  CONSTRAINT fk_rating_user FOREIGN KEY (user_id) REFERENCES users(id)
+);
+`;
+
 async function init() {
   // If MFA is required and passcode not in .env, prompt so it's set before snowflake config loads
   if (process.env.SNOWFLAKE_AUTHENTICATOR === 'USERNAME_PASSWORD_MFA' && !process.env.SNOWFLAKE_PASSCODE) {
@@ -120,6 +177,8 @@ async function init() {
     await execute(`USE SCHEMA ${schema}`);
     await execute(USERS_TABLE);
     console.log('Table users created or already exists.');
+    await execute(USER_CONFIGS_TABLE);
+    console.log('Table user_configs created or already exists.');
     await execute(COMMUNITIES_TABLE);
     console.log('Table communities created or already exists.');
     await execute(COMMUNITY_MEMBERS_TABLE);
@@ -130,6 +189,12 @@ async function init() {
     console.log('Table community_invites created or already exists.');
     await execute(FRIENDSHIPS_TABLE);
     console.log('Table friendships created or already exists.');
+    await execute(EVENTS_TABLE);
+    console.log('Table events created or already exists.');
+    await execute(EVENT_RSVPS_TABLE);
+    console.log('Table event_rsvps created or already exists.');
+    await execute(EVENT_RATINGS_TABLE);
+    console.log('Table event_ratings created or already exists.');
     console.log('Comunitree DB init done.');
   } catch (err) {
     console.error('Init failed:', err.message);

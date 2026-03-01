@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { body, validationResult } from 'express-validator';
 import * as userService from '../services/userService.js';
+import * as userConfigService from '../services/userConfigService.js';
 import * as communityService from '../services/communityService.js';
 import { requireAuth, signToken } from '../middleware/auth.js';
 
@@ -51,6 +52,7 @@ router.post('/register', registerValidators, async (req, res) => {
     });
 
     await communityService.createFriendGroupForUser(user.id);
+    await userConfigService.getOrCreateDefaultConfig(user.id);
 
     const token = signToken({ id: user.id, username: user.username });
     return res.status(201).json({
@@ -62,6 +64,9 @@ router.post('/register', registerValidators, async (req, res) => {
         phone_number: user.phone_number,
         display_name: user.display_name,
         bio: user.bio,
+        avatar_url: user.avatar_url,
+        avatar_color: user.avatar_color,
+        location: user.location,
         created_at: user.created_at,
       },
       token,
@@ -104,6 +109,9 @@ router.post('/login', loginValidators, async (req, res) => {
       phone_number: user.PHONE_NUMBER ?? user.phone_number,
       display_name: user.DISPLAY_NAME ?? user.display_name,
       bio: user.BIO ?? user.bio,
+      avatar_url: user.AVATAR_URL ?? user.avatar_url ?? null,
+      avatar_color: user.AVATAR_COLOR ?? user.avatar_color ?? null,
+      location: user.LOCATION ?? user.location ?? null,
       created_at: user.CREATED_AT || user.created_at,
     };
     return res.json({ user: safeUser, token });
@@ -114,7 +122,7 @@ router.post('/login', loginValidators, async (req, res) => {
 });
 
 /**
- * GET /auth/me — current user (requires JWT). Includes local_location_ids for Local/Traveler context.
+ * GET /auth/me — current user (requires JWT). Includes local_location_ids and config.
  */
 router.get('/me', requireAuth, async (req, res) => {
   try {
@@ -122,8 +130,11 @@ router.get('/me', requireAuth, async (req, res) => {
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
-    const local_location_ids = await communityService.getLocalLocationIds(req.user.id);
-    return res.json({ ...user, local_location_ids });
+    const [local_location_ids, config] = await Promise.all([
+      communityService.getLocalLocationIds(req.user.id),
+      userConfigService.getConfig(req.user.id),
+    ]);
+    return res.json({ ...user, local_location_ids, config });
   } catch (err) {
     console.error('Me error:', err);
     return res.status(500).json({ error: 'Failed to load user' });

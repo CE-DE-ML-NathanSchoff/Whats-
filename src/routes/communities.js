@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { body, param, query, validationResult } from 'express-validator';
 import * as communityService from '../services/communityService.js';
+import * as eventService from '../services/eventService.js';
 import { requireAuth, optionalAuth } from '../middleware/auth.js';
 
 const router = Router();
@@ -106,6 +107,53 @@ router.post(
       }
       console.error('Decline invite error:', err);
       return res.status(500).json({ error: 'Failed to decline invite' });
+    }
+  }
+);
+
+/**
+ * GET /communities/:id/events — event board: list events for this community (cascade for public; visibility applied).
+ */
+router.get(
+  '/:id/events',
+  optionalAuth,
+  [
+    param('id').trim().notEmpty().withMessage('Community id or slug required'),
+    query('limit').optional().isInt({ min: 1, max: 100 }).toInt(),
+    query('offset').optional().isInt({ min: 0 }).toInt(),
+    query('from_date').optional().isISO8601(),
+    query('to_date').optional().isISO8601(),
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+    try {
+      const idOrSlug = req.params.id;
+      const community =
+        UUID_REGEX.test(idOrSlug)
+          ? await communityService.getById(idOrSlug)
+          : await communityService.getBySlug(idOrSlug);
+      if (!community) {
+        return res.status(404).json({ error: 'Community not found' });
+      }
+      const limit = req.query.limit ? Number(req.query.limit) : 50;
+      const offset = req.query.offset ? Number(req.query.offset) : 0;
+      const events = await eventService.listEventsForCommunity(
+        community.id,
+        req.user?.id,
+        {
+          limit,
+          offset,
+          from_date: req.query.from_date,
+          to_date: req.query.to_date,
+        }
+      );
+      return res.json(events);
+    } catch (err) {
+      console.error('List community events error:', err);
+      return res.status(500).json({ error: 'Failed to list events' });
     }
   }
 );

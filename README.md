@@ -39,7 +39,7 @@ JavaScript backend for **Comunitree**, with user accounts and Snowflake for data
 
 3. **Initialize Snowflake schema**
 
-   Creates the `users` table (and database/schema if you use the defaults):
+   Creates the `users`, `communities`, `events`, and related tables (and database/schema if you use the defaults):
 
    ```bash
    npm run init-db
@@ -82,6 +82,25 @@ Base URL: `http://localhost:3000` (or your `PORT`).
 - `password_hash` (never returned in API)
 - `display_name`, `bio`, `avatar_url`
 - `is_active`, `created_at`, `updated_at`
+
+### Events
+
+Events belong to a community. If `community_id` is omitted on create, the event is assigned to the creator's friend community. Public-community events cascade to parent communities on the event board; private-community events do not. Event visibility: **public** events show all details; **private** events use per-field toggles in `visibility_settings` (e.g. `show_date`, `show_time`, `show_rsvp_count`, `show_ratings`, `show_creator`). An event appears on a community's event board only if its date is visible (always for public; for private, when `show_date` is true). RSVPs: only the event creator can see who RSVP'd; others see count when visibility allows. Ratings are fully anonymous (aggregate and count only; no one sees who rated).
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST | `/events` | Yes | Create event. Body: `title`, optional `community_id`, `event_date`, `event_time`, `broad_location`, `specific_location`, `description`, `is_public`, `visibility_settings` (for private). |
+| GET | `/events/:id` | Optional | Get one event; visibility applied for viewer. |
+| PATCH | `/events/:id` | Yes (creator) | Update event and/or `visibility_settings`. |
+| DELETE | `/events/:id` | Yes (creator) | Soft-deactivate event. |
+| GET | `/communities/:id/events` | Optional | Event board: list events for community (`limit`, `offset`, `from_date`, `to_date`). Private community: members only. |
+| POST | `/events/:id/rsvp` | Yes | Add current user's RSVP. |
+| DELETE | `/events/:id/rsvp` | Yes | Remove current user's RSVP. |
+| GET | `/events/:id/rsvps` | Yes | Creator: list of users who RSVP'd; others: `{ count }` when visibility allows. |
+| GET | `/events/:id/my-rsvp` | Yes | `{ rsvped: true }` or `{ rsvped: false }`. |
+| POST | `/events/:id/rate` | Yes | Set rating 1–5 (upsert). Body: `rating`. |
+| GET | `/events/:id/ratings` | Optional | `{ aggregate, count }` when visibility allows; fully anonymous. |
+| GET | `/events/:id/my-rating` | Yes | Current user's rating if any; for GUI "Your rating". |
 
 Use `Authorization: Bearer <token>` for protected routes.
 
