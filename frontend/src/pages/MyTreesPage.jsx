@@ -3,6 +3,111 @@ import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import BottomNav from '../components/Nav/BottomNav'
 import SkeletonCard from '../components/UI/SkeletonCard'
+import { useTheme } from '../context/ThemeContext'
+import { DARK, LIGHT } from '../lib/theme'
+
+const ALL_TIMEZONES = Intl.supportedValuesOf ? Intl.supportedValuesOf('timeZone') : [
+  'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles', 'UTC'
+]
+const userTz = Intl.DateTimeFormat().resolvedOptions().timeZone
+
+function formatEventTime(dateStr, tz) {
+  if (!dateStr) return ''
+  const d = new Date(dateStr)
+  if (isNaN(d.getTime())) return dateStr
+
+  const now = new Date()
+  const diffDays = (d - now) / (1000 * 60 * 60 * 24)
+
+  const opts = { hour: 'numeric', minute: '2-digit', hour12: true }
+  if (tz) opts.timeZone = tz
+
+  if (diffDays > 7 || diffDays < -1) {
+    opts.month = 'short'
+    opts.day = 'numeric'
+  } else {
+    opts.weekday = 'short'
+  }
+
+  try {
+    const datePart = d.toLocaleDateString('en-US', opts)
+    const timePart = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: tz }).toLowerCase()
+    return opts.weekday ? `${datePart.split(',')[0]} ${timePart.replace(' ', '')}` : `${datePart} ${timePart.replace(' ', '')}`
+  } catch (e) {
+    return dateStr
+  }
+}
+
+function tzLabel(tz) {
+  const parts = tz.split('/')
+  return parts.length > 1
+    ? `${parts[0].replace(/_/g, ' ')} / ${parts[parts.length - 1].replace(/_/g, ' ')}`
+    : tz.replace(/_/g, ' ')
+}
+
+function TimezoneSelect({ value, onChange }) {
+  const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState('')
+  const filtered = ALL_TIMEZONES.filter((tz) =>
+    tzLabel(tz).toLowerCase().includes(search.toLowerCase())
+  )
+  return (
+    <div style={{ position: 'relative' }}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="w-full text-left border-none cursor-pointer"
+        style={{
+          background: 'rgba(255,255,255,0.05)',
+          border: '1px solid rgba(255,255,255,0.1)',
+          borderRadius: 10,
+          padding: '12px 14px',
+          fontFamily: "'Poppins', sans-serif",
+          fontSize: 14,
+          color: value ? '#fff' : 'rgba(255,255,255,0.3)',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        }}
+      >
+        <span>{value ? tzLabel(value) : '🕐 Timezone'}</span>
+        <span style={{ opacity: 0.5, fontSize: 10 }}>{open ? '▲' : '▼'}</span>
+      </button>
+      {open && (
+        <div style={{
+          position: 'absolute', left: 0, right: 0, top: '110%', zIndex: 200,
+          background: '#0f2318', border: '1px solid rgba(82,183,136,0.25)',
+          borderRadius: 10, maxHeight: 200, display: 'flex', flexDirection: 'column', overflow: 'hidden',
+        }}>
+          <input
+            autoFocus type="text" placeholder="Search timezone..."
+            value={search} onChange={(e) => setSearch(e.target.value)}
+            style={{
+              flex: 'none', background: 'rgba(82,183,136,0.1)', border: 'none',
+              borderBottom: '1px solid rgba(82,183,136,0.2)', padding: '8px 12px',
+              color: '#fff', fontFamily: "'Poppins', sans-serif", fontSize: 12, outline: 'none',
+            }}
+          />
+          <div style={{ overflowY: 'auto', flex: 1 }}>
+            {filtered.map((tz) => (
+              <button key={tz} type="button"
+                onClick={() => { onChange(tz); setOpen(false); setSearch('') }}
+                style={{
+                  display: 'block', width: '100%', textAlign: 'left',
+                  background: tz === value ? 'rgba(82,183,136,0.2)' : 'transparent',
+                  border: 'none', padding: '9px 12px',
+                  color: tz === value ? '#52B788' : '#95D5B2',
+                  fontFamily: "'Poppins', sans-serif", fontSize: 12, cursor: 'pointer',
+                }}
+              >{tzLabel(tz)}</button>
+            ))}
+            {filtered.length === 0 && (
+              <p style={{ color: '#74C69D', fontSize: 12, padding: '10px 12px', fontFamily: "'Poppins', sans-serif" }}>No results</p>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 // ─── Stage data ───────────────────────────────────────────────────────────────
 
@@ -21,8 +126,8 @@ const MY_PLANTED = [
     title: 'Saturday Farmers Market 🌽',
     content: 'Fresh local produce every Saturday morning at Clark Park. Bring your own bags!',
     privacy: 'public',
-    waters_count: 12, growth_stage: 'oak',
-    branch_count: 2, event_time: 'Sat 9am',
+    waters_count: 12, growth_stage: 'mighty oak',
+    branch_count: 2, event_time: new Date(Date.now() + 2 * 86400000).toISOString(), timezone: userTz,
   },
   {
     id: 2,
@@ -30,23 +135,23 @@ const MY_PLANTED = [
     content: 'A private dinner for close friends. Bring something to share!',
     privacy: 'invite_only',
     waters_count: 3, growth_stage: 'sapling',
-    branch_count: 0, event_time: 'Sat 7pm',
+    branch_count: 0, event_time: new Date(Date.now() + 1 * 86400000).toISOString(), timezone: userTz,
     members: [
-      { id: 1, username: 'alex_r',   initials: 'AR', role: 'creator', status: 'accepted' },
-      { id: 2, username: 'maya_w',   initials: 'MW', role: 'member',  status: 'accepted' },
-      { id: 3, username: 'jordan_k', initials: 'JK', role: 'member',  status: 'pending'  },
+      { id: 1, username: 'alex_r', initials: 'AR', role: 'creator', status: 'accepted' },
+      { id: 2, username: 'maya_w', initials: 'MW', role: 'member', status: 'accepted' },
+      { id: 3, username: 'jordan_k', initials: 'JK', role: 'member', status: 'pending' },
     ],
   },
   {
     id: 3,
-    title: 'Neighborhood Watch 🔒',
-    content: 'Monthly meeting to discuss neighborhood safety and updates.',
+    title: 'Community Watch 🔒',
+    content: 'Monthly meeting to discuss community safety and updates.',
     privacy: 'private_group',
     waters_count: 6, growth_stage: 'tree',
-    branch_count: 1, event_time: 'Thu 7pm',
+    branch_count: 1, event_time: new Date(Date.now() + 4 * 86400000).toISOString(), timezone: userTz,
     members: [
-      { id: 1, username: 'alex_r',  initials: 'AR', role: 'creator', status: 'accepted' },
-      { id: 4, username: 'priya_s', initials: 'PS', role: 'member',  status: 'pending'  },
+      { id: 1, username: 'alex_r', initials: 'AR', role: 'creator', status: 'accepted' },
+      { id: 4, username: 'priya_s', initials: 'PS', role: 'member', status: 'pending' },
     ],
   },
 ]
@@ -56,7 +161,7 @@ const MY_WATERED = [
     id: 5,
     title: 'Block Party Planning 🎉',
     content: 'Annual block party coming up — help plan activities, food, and music for the whole block.',
-    waters_count: 7, growth_stage: 'tree', branch_count: 1, event_time: 'Sun 3pm', is_branch: false,
+    waters_count: 7, growth_stage: 'tree', branch_count: 1, event_time: new Date(Date.now() + 10 * 86400000).toISOString(), timezone: userTz, is_branch: false,
   },
 ]
 
@@ -65,7 +170,7 @@ const MY_BRANCHES = [
     id: 6,
     title: 'Cooking Demo 2pm',
     content: 'Learn to cook seasonal produce fresh from the market. All skill levels welcome.',
-    waters_count: 2, growth_stage: 'sprout', branch_count: 0, event_time: 'Sat 11am',
+    waters_count: 2, growth_stage: 'sprout', branch_count: 0, event_time: new Date(Date.now() + 8 * 86400000).toISOString(), timezone: userTz,
     is_branch: true, parent_title: 'Saturday Farmers Market 🌽',
   },
 ]
@@ -73,19 +178,19 @@ const MY_BRANCHES = [
 const STATS = { planted: 7, watered: 34, branches: 3 }
 
 const TABS = [
-  { id: 'planted',  label: '🌳 Planted' },
-  { id: 'watered',  label: '💧 Watered' },
+  { id: 'planted', label: '🌳 Planted' },
+  { id: 'watered', label: '💧 Watered' },
   { id: 'branches', label: '🌿 Branches' },
 ]
 
 // ─── MemberSheet ──────────────────────────────────────────────────────────────
 
 function MemberSheet({ tree, onClose }) {
-  const [memberTab,        setMemberTab]        = useState('accepted')
-  const [members,          setMembers]          = useState(tree?.members ?? [])
-  const [showInviteInput,  setShowInviteInput]  = useState(false)
-  const [inviteInput,      setInviteInput]      = useState('')
-  const [toast,            setToast]            = useState(null)
+  const [memberTab, setMemberTab] = useState('accepted')
+  const [members, setMembers] = useState(tree?.members ?? [])
+  const [showInviteInput, setShowInviteInput] = useState(false)
+  const [inviteInput, setInviteInput] = useState('')
+  const [toast, setToast] = useState(null)
 
   // Reset when tree changes
   useEffect(() => {
@@ -127,7 +232,7 @@ function MemberSheet({ tree, onClose }) {
   }
 
   const accepted = members.filter((m) => m.status === 'accepted')
-  const pending  = members.filter((m) => m.status === 'pending')
+  const pending = members.filter((m) => m.status === 'pending')
 
   const inputClass =
     'w-full rounded-[10px] px-4 py-3 text-white text-sm bg-white/5 border border-white/10 outline-none placeholder-white/30 focus:border-[#52B788] transition-colors'
@@ -222,7 +327,7 @@ function MemberSheet({ tree, onClose }) {
             >
               {['accepted', 'pending'].map((t) => {
                 const active = memberTab === t
-                const label  = t === 'accepted'
+                const label = t === 'accepted'
                   ? `Accepted (${accepted.length})`
                   : `Pending (${pending.length})`
                 return (
@@ -488,13 +593,65 @@ function MemberSheet({ tree, onClose }) {
 
 // ─── EditTreeSheet ────────────────────────────────────────────────────────────
 
+const PRIVACY_OPTIONS = [
+  {
+    id: 'public',
+    icon: '🌍',
+    title: 'Public',
+    subtitle: 'Anyone can discover and water your tree',
+    borderSelected: '#52B788',
+    bgSelected: 'rgba(82,183,136,0.1)',
+    dotColor: '#52B788',
+  },
+  {
+    id: 'private_group',
+    icon: '🔒',
+    title: 'Private Group',
+    subtitle: 'Visible on map, people request to join',
+    borderSelected: '#7DD3F0',
+    bgSelected: 'rgba(125,211,240,0.1)',
+    dotColor: '#7DD3F0',
+  },
+  {
+    id: 'invite_only',
+    icon: '🫂',
+    title: 'Invite Only',
+    subtitle: 'Hidden from map — only invited people see this',
+    borderSelected: '#FFD700',
+    bgSelected: 'rgba(255,215,0,0.08)',
+    dotColor: '#FFD700',
+  },
+]
+
 function EditTreeSheet({ tree, onClose }) {
-  const [name, setName]         = useState(tree?.title ?? '')
-  const [content, setContent]   = useState(tree?.content ?? '')
-  const [datetime, setDatetime] = useState('')
+  const isBranch = tree?.is_branch === true
+
+  const [name, setName] = useState(tree?.title ?? '')
+  const [description, setDescription] = useState(tree?.content ?? '')
+  const [datetime, setDatetime] = useState(tree?.event_time ?? '')
+  const [timezone, setTimezone] = useState(tree?.timezone ?? '')
+  const [privacy, setPrivacy] = useState(tree?.privacy ?? 'public')
+
+  // Re-initialise when the selected tree changes
+  useEffect(() => {
+    if (!tree) return
+    setName(tree.title ?? '')
+    setDescription(tree.content ?? '')
+    setLocation(tree.location ?? '')
+    setDatetime(tree.event_time ?? '')
+    setTimezone(tree.timezone ?? '')
+    setPrivacy(tree.privacy ?? 'public')
+  }, [tree?.id])
 
   const inputClass =
     'w-full rounded-[10px] px-4 py-3 text-white text-sm bg-white/5 border border-white/10 outline-none placeholder-white/30 focus:border-[#52B788] transition-colors'
+
+  function handleSave() {
+    console.log(isBranch ? 'Save branch' : 'Save tree', {
+      id: tree.id, name, description, location, datetime, privacy,
+    })
+    onClose()
+  }
 
   return (
     <AnimatePresence>
@@ -512,12 +669,13 @@ function EditTreeSheet({ tree, onClose }) {
 
           {/* Sheet */}
           <motion.div
-            className="absolute left-0 right-0 bottom-0 z-50"
+            className="absolute left-0 right-0 bottom-0 z-50 flex flex-col"
             style={{
               background: '#0D1F16',
               borderTop: '2px solid #2D6A4F',
               borderRadius: '20px 20px 0 0',
               padding: 20,
+              maxHeight: '85%',
             }}
             initial={{ y: '100%' }}
             animate={{ y: 0 }}
@@ -525,77 +683,164 @@ function EditTreeSheet({ tree, onClose }) {
             transition={{ type: 'spring', stiffness: 300, damping: 30 }}
           >
             {/* Handle */}
-            <div className="w-10 h-1 rounded-full mx-auto mb-5 bg-white/20" />
+            <div className="w-10 h-1 rounded-full mx-auto mb-5 bg-white/20 flex-shrink-0" />
 
             <h2
-              className="text-white mb-5"
+              className="text-white mb-5 flex-shrink-0"
               style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 700, fontSize: 16 }}
             >
-              Edit Tree ✏️
+              {isBranch ? 'Edit Branch 🌿' : 'Edit Tree ✏️'}
             </h2>
 
-            <div className="flex flex-col gap-3 mb-5">
-              <input
-                className={inputClass}
-                placeholder="Event name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-              <input
-                className={inputClass}
-                placeholder="Description"
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-              />
-              <input
-                type="datetime-local"
-                className={inputClass}
-                value={datetime}
-                onChange={(e) => setDatetime(e.target.value)}
-                style={{ colorScheme: 'dark' }}
-              />
+            {/* Scrollable fields */}
+            <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: 'none' }}>
+              <div className="flex flex-col gap-3 mb-5">
+
+                {/* Name */}
+                <input
+                  className={inputClass}
+                  placeholder={isBranch ? 'Branch activity / event name' : 'Tree name'}
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                />
+
+                {/* Description */}
+                <textarea
+                  className={inputClass}
+                  placeholder={isBranch ? 'Description' : "Description / What's happening?"}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={3}
+                  style={{ resize: 'none' }}
+                />
+
+                {/* Location */}
+                <input
+                  className={inputClass}
+                  placeholder="Location / Address"
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                />
+
+                {/* Date & Time */}
+                <input
+                  type="datetime-local"
+                  className={inputClass}
+                  value={datetime ? new Date(datetime).toISOString().slice(0, 16) : ''}
+                  onChange={(e) => setDatetime(e.target.value)}
+                  style={{ colorScheme: 'dark' }}
+                />
+                <TimezoneSelect value={timezone} onChange={setTimezone} />
+
+                {/* Privacy */}
+                <div>
+                  <p style={{
+                    fontFamily: "'Poppins', sans-serif",
+                    fontWeight: 600,
+                    fontSize: 13,
+                    color: '#fff',
+                    marginBottom: 8,
+                  }}>
+                    Who can see this? 👁️
+                  </p>
+                  <div className="flex flex-col gap-2">
+                    {PRIVACY_OPTIONS.map((opt) => {
+                      const active = privacy === opt.id
+                      return (
+                        <motion.button
+                          key={opt.id}
+                          type="button"
+                          onClick={() => setPrivacy(opt.id)}
+                          whileTap={{ scale: 0.97 }}
+                          className="flex items-center justify-between text-left border-none cursor-pointer"
+                          style={{
+                            borderRadius: 12,
+                            padding: '12px 14px',
+                            border: `1.5px solid ${active ? opt.borderSelected : 'rgba(82,183,136,0.15)'}`,
+                            background: active ? opt.bgSelected : 'transparent',
+                            transition: 'border-color 0.15s, background 0.15s',
+                          }}
+                        >
+                          <div>
+                            <p style={{
+                              fontFamily: "'Poppins', sans-serif",
+                              fontWeight: 600,
+                              fontSize: 13,
+                              color: '#fff',
+                              marginBottom: 2,
+                            }}>
+                              {opt.icon} {opt.title}
+                            </p>
+                            <p style={{
+                              fontFamily: "'Roboto', sans-serif",
+                              fontWeight: 400,
+                              fontSize: 11,
+                              color: '#74C69D',
+                            }}>
+                              {opt.subtitle}
+                            </p>
+                          </div>
+                          <div style={{
+                            width: 14,
+                            height: 14,
+                            borderRadius: '50%',
+                            flexShrink: 0,
+                            marginLeft: 12,
+                            border: active ? `2px solid ${opt.dotColor}` : '2px solid rgba(82,183,136,0.3)',
+                            background: active ? opt.dotColor : 'transparent',
+                            transition: 'background 0.15s, border-color 0.15s',
+                          }} />
+                        </motion.button>
+                      )
+                    })}
+                  </div>
+                </div>
+              </div>
             </div>
 
-            {/* Save */}
-            <motion.button
-              className="w-full py-3 text-white border-none cursor-pointer mb-3"
-              style={{
-                background: '#52B788',
-                borderRadius: 12,
-                fontFamily: "'Poppins', sans-serif",
-                fontWeight: 700,
-                fontSize: 14,
-              }}
-              whileTap={{ scale: 0.97 }}
-              onClick={() => { console.log('Save tree', { id: tree.id, name, content, datetime }); onClose() }}
-            >
-              Save Changes
-            </motion.button>
+            {/* ── Actions ── */}
+            <div className="flex-shrink-0">
+              {/* Save */}
+              <motion.button
+                className="w-full py-3 text-white border-none cursor-pointer mb-3"
+                style={{
+                  background: '#52B788',
+                  borderRadius: 12,
+                  fontFamily: "'Poppins', sans-serif",
+                  fontWeight: 700,
+                  fontSize: 14,
+                }}
+                whileTap={{ scale: 0.97 }}
+                onClick={handleSave}
+              >
+                Save Changes
+              </motion.button>
 
-            {/* Delete */}
-            <motion.button
-              className="w-full py-3 bg-transparent cursor-pointer mb-3"
-              style={{
-                border: '1px solid #FF4444',
-                color: '#FF4444',
-                borderRadius: 12,
-                fontFamily: "'Poppins', sans-serif",
-                fontWeight: 600,
-                fontSize: 14,
-              }}
-              whileTap={{ scale: 0.97 }}
-              onClick={() => { console.log('Delete tree', tree.id); onClose() }}
-            >
-              Delete Tree 🗑️
-            </motion.button>
+              {/* Delete */}
+              <motion.button
+                className="w-full py-3 bg-transparent cursor-pointer mb-3"
+                style={{
+                  border: '1px solid #FF4444',
+                  color: '#FF4444',
+                  borderRadius: 12,
+                  fontFamily: "'Poppins', sans-serif",
+                  fontWeight: 600,
+                  fontSize: 14,
+                }}
+                whileTap={{ scale: 0.97 }}
+                onClick={() => { console.log(`Delete ${isBranch ? 'branch' : 'tree'}`, tree.id); onClose() }}
+              >
+                {isBranch ? 'Delete Branch 🗑️' : 'Delete Tree 🗑️'}
+              </motion.button>
 
-            {/* Cancel */}
-            <button
-              onClick={onClose}
-              className="w-full text-white/40 text-sm bg-transparent border-none cursor-pointer"
-            >
-              Cancel
-            </button>
+              {/* Cancel */}
+              <button
+                onClick={onClose}
+                className="w-full text-white/40 text-sm bg-transparent border-none cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
           </motion.div>
         </>
       )}
@@ -626,7 +871,9 @@ function ProgressBar({ flowers, stage }) {
 
 // ─── TreeCard ─────────────────────────────────────────────────────────────────
 
-function TreeCard({ post, index, tab, onEdit, onManageMembers }) {
+function TreeCard({ post, index, tab, onEdit, onManageMembers, onUnwater }) {
+  const { isDark } = useTheme()
+  const t = isDark ? DARK : LIGHT
   const color = stageColor[post.growth_stage] ?? '#6B7280'
   const emoji = stageEmoji[post.growth_stage] ?? '🌰'
   const showManage =
@@ -640,9 +887,10 @@ function TreeCard({ post, index, tab, onEdit, onManageMembers }) {
       transition={{ delay: index * 0.06, duration: 0.28, ease: 'easeOut' }}
       className="mx-4 mb-3"
       style={{
-        background: '#0f2318',
+        background: t.bgCard,
         borderRadius: 16,
-        border: '1px solid rgba(82,183,136,0.15)',
+        border: isDark ? `1px solid ${t.border}` : 'none',
+        boxShadow: isDark ? 'none' : '0 1px 8px rgba(45,106,79,0.1)',
         padding: 16,
         position: 'relative',
       }}
@@ -706,8 +954,9 @@ function TreeCard({ post, index, tab, onEdit, onManageMembers }) {
 
         {/* Watered badge */}
         {tab === 'watered' && (
-          <span
-            className="rounded-[20px] px-2 py-0.5"
+          <button
+            onClick={() => onUnwater && onUnwater(post)}
+            className="rounded-[20px] px-2 py-0.5 border-none cursor-pointer"
             style={{
               background: 'rgba(125,211,240,0.15)',
               color: '#7DD3F0',
@@ -717,21 +966,20 @@ function TreeCard({ post, index, tab, onEdit, onManageMembers }) {
             }}
           >
             💧 Watered
-          </span>
+          </button>
         )}
 
         <span
-          className="ml-auto"
           style={{ color: '#74C69D', fontSize: 11, fontFamily: "'Roboto', sans-serif" }}
         >
-          {post.event_time}
+          {formatEventTime(post.event_time, post.timezone)}
         </span>
       </div>
 
       {/* Title */}
       <p
         className="mb-0.5"
-        style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 600, fontSize: 15, color: '#fff' }}
+        style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 600, fontSize: 15, color: t.textPrimary }}
       >
         {post.title}
       </p>
@@ -740,7 +988,7 @@ function TreeCard({ post, index, tab, onEdit, onManageMembers }) {
       {tab === 'branches' && post.parent_title && (
         <p
           className="mb-1.5"
-          style={{ color: '#74C69D', fontSize: 11, fontFamily: "'Roboto', sans-serif" }}
+          style={{ color: t.sprout, fontSize: 11, fontFamily: "'Roboto', sans-serif" }}
         >
           ↳ branch of {post.parent_title}
         </p>
@@ -753,7 +1001,7 @@ function TreeCard({ post, index, tab, onEdit, onManageMembers }) {
           fontFamily: "'Roboto', sans-serif",
           fontWeight: 400,
           fontSize: 12,
-          color: '#95D5B2',
+          color: t.pale,
           display: '-webkit-box',
           WebkitLineClamp: 2,
           WebkitBoxOrient: 'vertical',
@@ -803,6 +1051,8 @@ function TreeCard({ post, index, tab, onEdit, onManageMembers }) {
 const EMPTY_ICON = { planted: '🌱', watered: '💧', branches: '🌿' }
 
 function EmptyState({ tab }) {
+  const { isDark } = useTheme()
+  const t = isDark ? DARK : LIGHT
   return (
     <motion.div
       className="flex flex-col items-center justify-center pt-20"
@@ -811,10 +1061,10 @@ function EmptyState({ tab }) {
       transition={{ duration: 0.3 }}
     >
       <span style={{ fontSize: 48, lineHeight: 1, marginBottom: 16 }}>{EMPTY_ICON[tab]}</span>
-      <p style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 600, fontSize: 16, color: '#fff', marginBottom: 6 }}>
+      <p style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 600, fontSize: 16, color: t.textPrimary, marginBottom: 6 }}>
         No trees yet
       </p>
-      <p style={{ fontFamily: "'Roboto', sans-serif", fontSize: 13, color: '#74C69D' }}>
+      <p style={{ fontFamily: "'Roboto', sans-serif", fontSize: 13, color: t.sprout }}>
         Tap the map to plant your first tree
       </p>
     </motion.div>
@@ -823,33 +1073,46 @@ function EmptyState({ tab }) {
 
 // ─── MyTreesPage ──────────────────────────────────────────────────────────────
 
-const TAB_DATA = { planted: MY_PLANTED, watered: MY_WATERED, branches: MY_BRANCHES }
-
 export default function MyTreesPage() {
   const navigate = useNavigate()
-  const [activeTab,    setActiveTab]    = useState('planted')
-  const [editTree,     setEditTree]     = useState(null)
-  const [memberSheet,  setMemberSheet]  = useState(null)
-  const [loading,      setLoading]      = useState(true)
+  const { isDark } = useTheme()
+  const t = isDark ? DARK : LIGHT
+  const [activeTab, setActiveTab] = useState('planted')
+  const [editTree, setEditTree] = useState(null)
+  const [memberSheet, setMemberSheet] = useState(null)
+  const [unwaterTree, setUnwaterTree] = useState(null)
+  const [wateredList, setWateredList] = useState(MY_WATERED)
+  const [toast, setToast] = useState(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const t = setTimeout(() => setLoading(false), 1200)
     return () => clearTimeout(t)
   }, [])
 
-  const posts = TAB_DATA[activeTab]
+  const posts = activeTab === 'watered' ? wateredList : activeTab === 'planted' ? MY_PLANTED : MY_BRANCHES
+
+  function handleConfirmUnwater() {
+    setWateredList(prev => prev.filter(p => p.id !== unwaterTree.id))
+    setUnwaterTree(null)
+    setToast('Support removed. You can always water again later! 🌱')
+    setTimeout(() => setToast(null), 3000)
+  }
 
   return (
-    <div className="relative w-[360px] h-[640px] overflow-hidden bg-[#0D1F16] flex flex-col">
+    <div
+      className="relative w-[360px] h-[640px] overflow-hidden flex flex-col"
+      style={{ background: t.bg, transition: 'background 0.3s ease' }}
+    >
 
       {/* ── Header ── */}
       <div className="flex-shrink-0 px-5 flex items-start justify-between" style={{ paddingTop: 56 }}>
         <div>
-          <h1 style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 700, fontSize: 20, color: '#fff', marginBottom: 2 }}>
+          <h1 style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 700, fontSize: 20, color: t.textPrimary, marginBottom: 2 }}>
             My Trees 🌳
           </h1>
-          <p style={{ fontFamily: "'Roboto', sans-serif", fontWeight: 400, fontSize: 13, color: '#74C69D' }}>
-            Your roots in the neighborhood
+          <p style={{ fontFamily: "'Roboto', sans-serif", fontWeight: 400, fontSize: 13, color: t.sprout }}>
+            Your roots in the community
           </p>
         </div>
         <button
@@ -869,7 +1132,7 @@ export default function MyTreesPage() {
       {/* ── Tab Row ── */}
       <div
         className="flex-shrink-0 flex px-5 mt-4 gap-6"
-        style={{ borderBottom: '1px solid rgba(82,183,136,0.1)' }}
+        style={{ borderBottom: `1px solid ${t.border}` }}
       >
         {TABS.map((tab) => {
           const active = activeTab === tab.id
@@ -882,7 +1145,7 @@ export default function MyTreesPage() {
                 fontFamily: "'Poppins', sans-serif",
                 fontWeight: active ? 600 : 400,
                 fontSize: 14,
-                color: active ? '#fff' : '#3a5a45',
+                color: active ? t.textPrimary : t.navInactive,
               }}
             >
               {tab.label}
@@ -902,15 +1165,15 @@ export default function MyTreesPage() {
       {/* ── Stats Bar ── */}
       <div
         className="flex-shrink-0 flex items-center mx-4 mt-3 mb-1 rounded-[12px]"
-        style={{ background: 'rgba(45,106,79,0.15)', padding: '12px 0' }}
+        style={{ background: isDark ? 'rgba(45,106,79,0.15)' : 'rgba(40,51,45,0.04)', padding: '12px 0' }}
       >
         {[
-          { val: STATS.planted,  label: '🌳 Planted' },
-          { val: STATS.watered,  label: '💧 Watered' },
+          { val: STATS.planted, label: '🌳 Planted' },
+          { val: STATS.watered, label: '💧 Watered' },
           { val: STATS.branches, label: '🌿 Branches' },
         ].map((s, i) => (
-          <div key={s.label} className="flex-1 flex flex-col items-center" style={{ borderLeft: i > 0 ? '1px solid rgba(82,183,136,0.15)' : 'none' }}>
-            <span style={{ fontFamily: "'Roboto', sans-serif", fontWeight: 500, fontSize: 12, color: '#95D5B2' }}>
+          <div key={s.label} className="flex-1 flex flex-col items-center" style={{ borderLeft: i > 0 ? `1px solid ${t.border}` : 'none' }}>
+            <span style={{ fontFamily: "'Roboto', sans-serif", fontWeight: 500, fontSize: 12, color: t.textPrimary }}>
               {s.val} {s.label}
             </span>
           </div>
@@ -948,6 +1211,7 @@ export default function MyTreesPage() {
                   tab={activeTab}
                   onEdit={setEditTree}
                   onManageMembers={setMemberSheet}
+                  onUnwater={setUnwaterTree}
                 />
               ))}
             </motion.div>
@@ -960,8 +1224,72 @@ export default function MyTreesPage() {
       </div>
 
       {/* ── Sheets ── */}
-      <EditTreeSheet  tree={editTree}    onClose={() => setEditTree(null)}    />
-      <MemberSheet    tree={memberSheet} onClose={() => setMemberSheet(null)} />
+      <EditTreeSheet tree={editTree} onClose={() => setEditTree(null)} />
+      <MemberSheet tree={memberSheet} onClose={() => setMemberSheet(null)} />
+
+      {/* Un-water Confirmation Dialog */}
+      <AnimatePresence>
+        {unwaterTree && (
+          <motion.div
+            className="absolute inset-0 z-50 flex items-center justify-center p-6"
+            style={{ background: 'rgba(0,0,0,0.7)' }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div
+              className="bg-[#0f2318] w-full max-w-[280px] rounded-2xl p-6 text-center shadow-xl border border-[rgba(82,183,136,0.2)]"
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 20 }}
+            >
+              <span className="text-4xl mb-3 block">💧</span>
+              <h3 className="text-white font-bold text-lg font-poppins mb-2">Remove Support?</h3>
+              <p className="text-[#95D5B2] text-sm font-roboto mb-6 leading-relaxed">
+                Do you want to remove your support? You can always water again later.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setUnwaterTree(null)}
+                  className="flex-1 py-2.5 rounded-xl border border-[#2D6A4F] bg-transparent text-[#74C69D] font-poppins text-sm font-semibold cursor-pointer"
+                >
+                  No
+                </button>
+                <button
+                  onClick={handleConfirmUnwater}
+                  className="flex-1 py-2.5 rounded-xl border-none bg-[#2D6A4F] text-white font-poppins text-sm font-semibold cursor-pointer"
+                >
+                  Yes
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Toast */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            className="absolute left-1/2 -translate-x-1/2 z-50 rounded-full px-4 py-2 text-center"
+            style={{
+              bottom: 80,
+              width: 'max-content',
+              maxWidth: '320px',
+              background: '#2D6A4F',
+              fontFamily: "'Poppins', sans-serif",
+              fontSize: 12,
+              color: '#fff',
+            }}
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 16 }}
+            transition={{ duration: 0.2 }}
+          >
+            {toast}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ── Bottom Nav ── */}
       <BottomNav />

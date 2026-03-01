@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 
 // ─── Interest options ────────────────────────────────────────────────────────
@@ -16,26 +17,26 @@ const SLIDES = [
   {
     title: 'Connect & Grow Together',
     subtitle:
-      'Discover events in your neighborhood. Watch your community grow from seeds to forests.',
+      'Discover events in your city or town. Watch your community grow from seeds to forests.',
     leftLabel: 'Skip Intro',
     rightLabel: 'NEXT',
   },
   null, // slide 1: how it works — rendered separately
   null, // slide 2: interests — rendered separately
   {
-    title: 'Your Neighborhood Comes Alive',
+    title: 'Your Community Comes Alive',
     subtitle:
-      'Every event is a seed. Every neighbor who joins helps it grow into a tree.',
+      'Every event is a seed. Every person who joins helps it grow into a mighty tree.',
     leftLabel: 'Go Back',
-    rightLabel: 'GET STARTED',
+    rightLabel: 'Start Exploring',
   },
 ]
 
 const HOW_IT_WORKS_ITEMS = [
-  { icon: '🌰', stage: 'Seed',   meaning: 'A new idea\nor event posted' },
-  { icon: '🌱', stage: 'Sprout', meaning: '1–2 neighbors\nwatered it' },
-  { icon: '🌲', stage: 'Tree',   meaning: 'Growing fast\n3–10 neighbors' },
-  { icon: '🌳', stage: 'Ancient Oak ✨', meaning: 'Neighborhood\nlegend 10+' },
+  { icon: '🌰', stage: 'Seed', meaning: 'A new idea\nor event posted' },
+  { icon: '🌱', stage: 'Sprout', meaning: '1–2 attendees\nwatered it' },
+  { icon: '🌲', stage: 'Tree', meaning: 'Growing fast\n3–10 attendees' },
+  { icon: '🌳', stage: 'Mighty Oak ✨', meaning: 'Community\nlegend 10+' },
 ]
 
 const staggerContainer = {
@@ -44,7 +45,7 @@ const staggerContainer = {
 }
 const staggerItem = {
   hidden: { opacity: 0, y: 12 },
-  show:   { opacity: 1, y: 0, transition: { duration: 0.3 } },
+  show: { opacity: 1, y: 0, transition: { duration: 0.3 } },
 }
 
 const variants = {
@@ -125,7 +126,7 @@ function HowItWorksSlide() {
       {/* Illustration area */}
       <div
         className="absolute left-0 right-0 top-0 flex items-end justify-around px-4 pb-4"
-        style={{ height: 219, background: '#f2f9f3' }}
+        style={{ height: 195, background: '#f2f9f3' }}
       >
         <motion.div
           className="flex w-full justify-around items-end"
@@ -172,7 +173,7 @@ function HowItWorksSlide() {
       </div>
 
       {/* Text content */}
-      <div style={{ position: 'absolute', top: 228, left: 32, right: 32 }}>
+      <div style={{ position: 'absolute', top: 206, left: 32, right: 32 }}>
         <p
           style={{
             fontFamily: "'Poppins', sans-serif",
@@ -197,7 +198,7 @@ function HowItWorksSlide() {
         >
           Every time you water a tree, it grows stronger.
           Trees grow branches. Branches become forests.
-          This is how neighborhoods come alive.
+          This is how communities come alive.
         </p>
 
         {/* Callout box */}
@@ -259,7 +260,7 @@ function InterestSlide({ interests, customInterest, onToggle, onCustomChange, on
       </div>
 
       {/* "Other" custom input */}
-      <div className="flex gap-2 mb-auto">
+      <div className="flex gap-2 mb-auto" style={{ maxWidth: 250 }}>
         <input
           className="flex-1 outline-none text-[13px]"
           style={{
@@ -297,14 +298,20 @@ function InterestSlide({ interests, customInterest, onToggle, onCustomChange, on
 // ─── OnboardingPage ──────────────────────────────────────────────────────────
 
 function OnboardingPage({ onComplete }) {
-  const [current, setCurrent]             = useState(0)
-  const [direction, setDirection]         = useState(1)
-  const [interests, setInterests]         = useState([])
+  const navigate = useNavigate()
+  const [current, setCurrent] = useState(0)
+  const [direction, setDirection] = useState(1)
+  const [interests, setInterests] = useState([])
   const [customInterest, setCustomInterest] = useState('')
 
   const isHowItWorksSlide = current === 1
-  const isInterestSlide   = current === 2
+  const isInterestSlide = current === 2
   const slide = SLIDES[current]
+
+  const finish = () => {
+    if (onComplete) onComplete()
+    else navigate('/map')
+  }
 
   const goTo = (next) => {
     setDirection(next > current ? 1 : -1)
@@ -312,13 +319,13 @@ function OnboardingPage({ onComplete }) {
   }
 
   const handleLeft = () => {
-    if (current === 0) onComplete?.()
+    if (current === 0) finish()
     else goTo(current - 1)
   }
 
   const handleRight = () => {
     if (current < TOTAL_SLIDES - 1) goTo(current + 1)
-    else onComplete?.()
+    else finish()
   }
 
   const toggleInterest = (interest) => {
@@ -335,10 +342,10 @@ function OnboardingPage({ onComplete }) {
     setCustomInterest('')
   }
 
-  const leftLabel  = (isHowItWorksSlide || isInterestSlide) ? 'Go Back' : slide.leftLabel
+  const leftLabel = (isHowItWorksSlide || isInterestSlide) ? 'Go Back' : slide.leftLabel
   const rightLabel = isHowItWorksSlide ? 'NEXT'
-                   : isInterestSlide   ? 'Plant My Experience 🌱'
-                   : slide.rightLabel
+    : isInterestSlide ? 'Plant My Experience 🌱'
+      : slide.rightLabel
 
   return (
     <div
@@ -395,24 +402,23 @@ function OnboardingPage({ onComplete }) {
                 <div className="absolute left-0 right-0 top-0 h-[219px]">
                   <Illustration index={current} />
                 </div>
-                <p
-                  className="absolute font-bold text-[22px] leading-[33px] text-[#28332D]"
-                  style={{ fontFamily: "'Poppins', sans-serif", left: 32, top: 219, width: 253 }}
-                >
-                  {slide.title}
-                </p>
-                <p
-                  className="absolute text-[14px] leading-[22px]"
-                  style={{
-                    fontFamily: "'Roboto', sans-serif",
-                    color: 'rgba(40,51,45,0.6)',
-                    left: 32,
-                    top: 262,
-                    width: 253,
-                  }}
-                >
-                  {slide.subtitle}
-                </p>
+                <div className="absolute left-0 right-0" style={{ top: 219, padding: '24px 32px' }}>
+                  <p
+                    className="font-bold text-[22px] leading-[33px] text-[#28332D]"
+                    style={{ fontFamily: "'Poppins', sans-serif", marginBottom: 8 }}
+                  >
+                    {slide.title}
+                  </p>
+                  <p
+                    className="text-[14px] leading-[22px]"
+                    style={{
+                      fontFamily: "'Roboto', sans-serif",
+                      color: 'rgba(40,51,45,0.6)',
+                    }}
+                  >
+                    {slide.subtitle}
+                  </p>
+                </div>
               </>
             )}
 
@@ -421,30 +427,37 @@ function OnboardingPage({ onComplete }) {
               <Dots current={current} />
             </div>
 
-            {/* Left text button */}
-            <button
-              className="absolute p-0 bg-transparent border-none cursor-pointer text-[14px] font-medium leading-[16px]"
-              style={{ fontFamily: "'Roboto', sans-serif", color: '#28332D', left: 48, top: 472 }}
-              onClick={handleLeft}
+            {/* Bottom Nav Buttons */}
+            <div
+              className="absolute left-0 right-0 flex items-center justify-center gap-[32px]"
+              style={{ top: 460 }}
             >
-              {leftLabel}
-            </button>
+              {/* Left text button — hidden on first slide so users complete all steps */}
+              {current > 0 && (
+                <button
+                  className="p-0 bg-transparent border-none cursor-pointer text-[14px] font-medium leading-[16px]"
+                  style={{ fontFamily: "'Roboto', sans-serif", color: '#28332D' }}
+                  onClick={handleLeft}
+                >
+                  {leftLabel}
+                </button>
+              )}
 
-            {/* Right filled button */}
-            <button
-              className="absolute h-[40px] rounded-[5px] border-none cursor-pointer text-white text-[14px] font-medium leading-[16px]"
-              style={{
-                fontFamily: "'Roboto', sans-serif",
-                background: '#1BBC65',
-                right: 32,
-                top: 460,
-                paddingLeft: 16,
-                paddingRight: 16,
-              }}
-              onClick={handleRight}
-            >
-              {rightLabel}
-            </button>
+              {/* Right filled button */}
+              <button
+                className="h-[40px] rounded-[5px] border-none cursor-pointer text-white font-medium flex items-center justify-center"
+                style={{
+                  fontFamily: "'Roboto', sans-serif",
+                  fontSize: rightLabel.length > 10 ? 13 : 14,
+                  background: '#1BBC65',
+                  paddingLeft: rightLabel.length > 10 ? 12 : 16,
+                  paddingRight: rightLabel.length > 10 ? 12 : 16,
+                }}
+                onClick={handleRight}
+              >
+                {rightLabel}
+              </button>
+            </div>
           </motion.div>
         </AnimatePresence>
       </div>

@@ -4,20 +4,20 @@ import { motion, AnimatePresence } from 'framer-motion'
 // ─── Filter config ────────────────────────────────────────────────────────────
 
 const STAGE_OPTIONS = [
-  { value: 'seed',    label: '🌰 seed',    color: '#6B7280' },
-  { value: 'sprout',  label: '🌱 sprout',  color: '#74C69D' },
+  { value: 'seed', label: '🌰 seed', color: '#6B7280' },
+  { value: 'sprout', label: '🌱 sprout', color: '#74C69D' },
   { value: 'sapling', label: '🌿 sapling', color: '#52B788' },
-  { value: 'tree',    label: '🌲 tree',    color: '#2D6A4F' },
-  { value: 'oak',     label: '🌳 Ancient Oak ✨', color: '#FFD700' },
+  { value: 'tree', label: '🌲 tree', color: '#2D6A4F' },
+  { value: 'oak', label: '🌳 Mighty Oak ✨', color: '#FFD700' },
 ]
 
 const DISTANCE_OPTIONS = ['10 mi', '20 mi', '30 mi', '40 mi', '50 mi', 'Custom']
-const TIME_OPTIONS      = ['Today', 'This Week', 'Weekend', 'Upcoming', 'Any']
-const TYPE_OPTIONS      = ['All', 'Trees Only', 'Branches Only']
-const SORT_OPTIONS      = ['Newest', 'Most Watered', 'Growing Fast']
+const TIME_OPTIONS = ['Today', 'This Week', 'Weekend', 'Upcoming', 'Any']
+const TYPE_OPTIONS = ['All', 'Trees Only', 'Branches Only']
+const SORT_OPTIONS = ['Newest', 'Most Watered', 'Growing Fast']
 
 const DEFAULTS = {
-  stages: [], distance: '10 mi', time: 'Any', type: 'All', sort: 'Newest',
+  stages: [], distance: '10 mi', time: 'Any', type: 'All', sort: 'Newest', showFallen: false,
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -26,9 +26,10 @@ function countActive(filters) {
   return (
     filters.stages.length +
     (filters.distance !== '10 mi' ? 1 : 0) +
-    (filters.time     !== 'Any'   ? 1 : 0) +
-    (filters.type     !== 'All'   ? 1 : 0) +
-    (filters.sort     !== 'Newest' ? 1 : 0)
+    (filters.time !== 'Any' ? 1 : 0) +
+    (filters.type !== 'All' ? 1 : 0) +
+    (filters.sort !== 'Newest' ? 1 : 0) +
+    (filters.showFallen ? 1 : 0)
   )
 }
 
@@ -266,6 +267,45 @@ export default function FilterSheet({ open, onClose, filters, onFiltersChange })
                   />
                 ))}
               </div>
+            </div>
+
+            {/* ── Filter 6: Show Fallen Trees ── */}
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <p style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 600, fontSize: 13, color: '#fff', marginBottom: 2 }}>
+                  🍂 Show Fallen Trees
+                </p>
+                <p style={{ fontFamily: "'Roboto', sans-serif", fontWeight: 400, fontSize: 11, color: '#74C69D' }}>
+                  Include events that have already passed
+                </p>
+              </div>
+              <motion.button
+                onClick={() => onFiltersChange({ ...filters, showFallen: !filters.showFallen })}
+                className="border-none cursor-pointer flex-shrink-0"
+                style={{
+                  width: 44,
+                  height: 24,
+                  borderRadius: 12,
+                  background: filters.showFallen ? '#4a3728' : 'rgba(82,183,136,0.15)',
+                  position: 'relative',
+                  border: `1px solid ${filters.showFallen ? '#8b7355' : 'rgba(82,183,136,0.25)'}`,
+                  padding: 0,
+                }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <motion.div
+                  style={{
+                    width: 18,
+                    height: 18,
+                    borderRadius: '50%',
+                    background: filters.showFallen ? '#c8956c' : '#3a5a45',
+                    position: 'absolute',
+                    top: 2,
+                  }}
+                  animate={{ left: filters.showFallen ? 22 : 2 }}
+                  transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+                />
+              </motion.button>
             </div>
 
             {/* Apply button */}

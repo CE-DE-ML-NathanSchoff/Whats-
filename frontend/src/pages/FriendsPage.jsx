@@ -1,8 +1,10 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import BottomNav from '../components/Nav/BottomNav'
-import SideMenu, { FRIENDS_SECTION_IDS } from '../components/Nav/SideMenu'
+import SideMenu from '../components/Nav/SideMenu'
+import { useTheme } from '../context/ThemeContext'
+import { DARK, LIGHT } from '../lib/theme'
 
 // ─── Stage data (matches PostCard / ExplorePage) ─────────────────────────────
 
@@ -16,11 +18,11 @@ const stageEmoji = {
 // ─── Mock data ───────────────────────────────────────────────────────────────
 
 const RECENT_ACTIVITY = [
-  { id: 1, text: "Sarah watered 'Farmers Market' 💧",       time: '2h ago',   postId: 1 },
-  { id: 2, text: "Mike tended 'Startup Meetup' 🌿",         time: 'just now', postId: 3 },
-  { id: 3, text: "3 friends watered 'Open Mic Night' 🌱",   time: '5m ago',   postId: 5 },
-  { id: 4, text: "Jess watered 'Community Garden' 💧",      time: '1h ago',   postId: 4 },
-  { id: 5, text: "Leo tended 'Neighborhood Cleanup' 🌿",    time: '30m ago',  postId: 2 },
+  { id: 1, text: "Sarah watered 'Farmers Market' 💧", time: '2h ago', postId: 1 },
+  { id: 2, text: "Mike tended 'Startup Meetup' 🌿", time: 'just now', postId: 3 },
+  { id: 3, text: "3 friends watered 'Open Mic Night' 🌱", time: '5m ago', postId: 5 },
+  { id: 4, text: "Jess watered 'Community Garden' 💧", time: '1h ago', postId: 4 },
+  { id: 5, text: "Leo tended 'Community Cleanup' 🌿", time: '30m ago', postId: 2 },
 ]
 
 const FRIEND_TREES = [
@@ -31,7 +33,7 @@ const FRIEND_TREES = [
     friends_watering: 4, time_label: 'Sat 8am',
   },
   {
-    id: 3, title: 'Neighborhood Cleanup 🌳',
+    id: 3, title: 'Community Cleanup 🌳',
     content: 'Monthly cleanup crew keeping our streets beautiful.',
     waters_count: 8, growth_stage: 'tree', branch_count: 1,
     friends_watering: 3, time_label: 'Sun 10am',
@@ -45,10 +47,10 @@ const FRIEND_TREES = [
 ]
 
 const MY_CIRCLE = [
-  { id: 1, username: 'Sarah M.',   waters_count: 24, branch_count: 3, lastActive: '2h ago'  },
-  { id: 2, username: 'Mike R.',    waters_count: 18, branch_count: 5, lastActive: 'just now' },
-  { id: 3, username: 'Jess K.',    waters_count: 11, branch_count: 1, lastActive: '1h ago'   },
-  { id: 4, username: 'Leo P.',     waters_count: 9,  branch_count: 2, lastActive: '30m ago'  },
+  { id: 1, username: 'Sarah M.', waters_count: 24, branch_count: 3, lastActive: '2h ago' },
+  { id: 2, username: 'Mike R.', waters_count: 18, branch_count: 5, lastActive: 'just now' },
+  { id: 3, username: 'Jess K.', waters_count: 11, branch_count: 1, lastActive: '1h ago' },
+  { id: 4, username: 'Leo P.', waters_count: 9, branch_count: 2, lastActive: '30m ago' },
 ]
 
 const REQUESTS = [
@@ -58,20 +60,32 @@ const REQUESTS = [
 
 // ─── Section header ──────────────────────────────────────────────────────────
 
-function SectionHeader({ children }) {
+function SectionHeader({ children, onSeeAll }) {
+  const { isDark } = useTheme()
+  const t = isDark ? DARK : LIGHT
   return (
-    <p
-      className="px-5 mb-2"
-      style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 600, fontSize: 14, color: '#fff' }}
-    >
-      {children}
-    </p>
+    <div className="px-5 mb-2 flex items-center justify-between">
+      <p style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 600, fontSize: 14, color: t.textPrimary }}>
+        {children}
+      </p>
+      {onSeeAll && (
+        <button
+          onClick={onSeeAll}
+          className="bg-transparent border-none cursor-pointer"
+          style={{ fontFamily: "'Roboto', sans-serif", fontSize: 12, color: t.sprout }}
+        >
+          See all →
+        </button>
+      )}
+    </div>
   )
 }
 
 // ─── Activity item ───────────────────────────────────────────────────────────
 
 function ActivityItem({ item, index, onTap }) {
+  const { isDark } = useTheme()
+  const t = isDark ? DARK : LIGHT
   return (
     <motion.button
       initial={{ opacity: 0, y: 12 }}
@@ -90,12 +104,12 @@ function ActivityItem({ item, index, onTap }) {
       <div className="flex-1 min-w-0">
         <p
           className="truncate"
-          style={{ fontFamily: "'Roboto', sans-serif", fontWeight: 400, fontSize: 13, color: '#fff' }}
+          style={{ fontFamily: "'Roboto', sans-serif", fontWeight: 400, fontSize: 13, color: t.textPrimary }}
         >
           {item.text}
         </p>
       </div>
-      <span style={{ fontFamily: "'Roboto', sans-serif", fontSize: 11, color: '#74C69D', flexShrink: 0 }}>
+      <span style={{ fontFamily: "'Roboto', sans-serif", fontSize: 11, color: t.sprout, flexShrink: 0 }}>
         {item.time}
       </span>
     </motion.button>
@@ -105,6 +119,8 @@ function ActivityItem({ item, index, onTap }) {
 // ─── Friend tree card (matches EventCard styling) ────────────────────────────
 
 function FriendTreeCard({ post, index }) {
+  const { isDark } = useTheme()
+  const t = isDark ? DARK : LIGHT
   const color = stageColor[post.growth_stage] ?? '#6B7280'
   const emoji = stageEmoji[post.growth_stage] ?? '🌰'
 
@@ -115,9 +131,10 @@ function FriendTreeCard({ post, index }) {
       transition={{ delay: index * 0.06, duration: 0.28, ease: 'easeOut' }}
       className="mx-4 mb-3"
       style={{
-        background: '#0f2318',
+        background: t.bgCard,
         borderRadius: 16,
-        border: '1px solid rgba(82,183,136,0.15)',
+        border: isDark ? `1px solid ${t.border}` : 'none',
+        boxShadow: isDark ? 'none' : '0 1px 8px rgba(45,106,79,0.1)',
         padding: 16,
       }}
     >
@@ -134,14 +151,14 @@ function FriendTreeCard({ post, index }) {
         >
           {emoji} {post.growth_stage}
         </span>
-        <span style={{ color: '#74C69D', fontSize: 11, fontFamily: "'Roboto', sans-serif" }}>
+        <span style={{ color: t.sprout, fontSize: 11, fontFamily: "'Roboto', sans-serif" }}>
           {post.time_label}
         </span>
       </div>
 
       <p
         className="mb-1.5"
-        style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 600, fontSize: 15, color: '#fff' }}
+        style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 600, fontSize: 15, color: t.textPrimary }}
       >
         {post.title}
       </p>
@@ -152,7 +169,7 @@ function FriendTreeCard({ post, index }) {
           fontFamily: "'Roboto', sans-serif",
           fontWeight: 400,
           fontSize: 12,
-          color: '#95D5B2',
+          color: t.pale,
           display: '-webkit-box',
           WebkitLineClamp: 2,
           WebkitBoxOrient: 'vertical',
@@ -182,6 +199,8 @@ function FriendTreeCard({ post, index }) {
 // ─── Circle item ─────────────────────────────────────────────────────────────
 
 function CircleItem({ friend, index }) {
+  const { isDark } = useTheme()
+  const t = isDark ? DARK : LIGHT
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
@@ -197,14 +216,14 @@ function CircleItem({ friend, index }) {
         <span style={{ fontSize: 16 }}>👤</span>
       </div>
       <div className="flex-1 min-w-0">
-        <p style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 600, fontSize: 13, color: '#fff' }}>
+        <p style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 600, fontSize: 13, color: t.textPrimary }}>
           {friend.username}
         </p>
-        <p style={{ fontFamily: "'Roboto', sans-serif", fontSize: 11, color: '#74C69D' }}>
+        <p style={{ fontFamily: "'Roboto', sans-serif", fontSize: 11, color: t.sprout }}>
           💧 {friend.waters_count} · 🌿 {friend.branch_count}
         </p>
       </div>
-      <span style={{ fontFamily: "'Roboto', sans-serif", fontSize: 10, color: '#52B788' }}>
+      <span style={{ fontFamily: "'Roboto', sans-serif", fontSize: 10, color: t.light }}>
         Active {friend.lastActive}
       </span>
     </motion.div>
@@ -214,6 +233,8 @@ function CircleItem({ friend, index }) {
 // ─── Request item ────────────────────────────────────────────────────────────
 
 function RequestItem({ request, index, onAccept, onDecline }) {
+  const { isDark } = useTheme()
+  const t = isDark ? DARK : LIGHT
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
@@ -229,10 +250,10 @@ function RequestItem({ request, index, onAccept, onDecline }) {
         <span style={{ fontSize: 16 }}>👤</span>
       </div>
       <div className="flex-1 min-w-0">
-        <p style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 600, fontSize: 13, color: '#fff' }}>
+        <p style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 600, fontSize: 13, color: t.textPrimary }}>
           {request.username}
         </p>
-        <p style={{ fontFamily: "'Roboto', sans-serif", fontSize: 11, color: '#74C69D' }}>
+        <p style={{ fontFamily: "'Roboto', sans-serif", fontSize: 11, color: t.sprout }}>
           {request.mutual} mutual friends
         </p>
       </div>
@@ -274,77 +295,80 @@ function RequestItem({ request, index, onAccept, onDecline }) {
 
 export default function FriendsPage() {
   const navigate = useNavigate()
-  const [requests, setRequests]   = useState(REQUESTS)
-  const [menuOpen, setMenuOpen]   = useState(false)
-  const [activeSection, setActiveSection] = useState(FRIENDS_SECTION_IDS.RECENT_ACTIVITY)
+  const { isDark } = useTheme()
+  const t = isDark ? DARK : LIGHT
+  const [requests, setRequests] = useState(REQUESTS)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const scrollRef = useRef(null)
 
-  const scrollRef           = useRef(null)
-  const recentActivityRef   = useRef(null)
-  const friendTreesRef      = useRef(null)
-  const yourCircleRef       = useRef(null)
-  const requestsRef         = useRef(null)
-
-  const sectionRefs = {
-    [FRIENDS_SECTION_IDS.RECENT_ACTIVITY]: recentActivityRef,
-    [FRIENDS_SECTION_IDS.FRIEND_TREES]:     friendTreesRef,
-    [FRIENDS_SECTION_IDS.YOUR_CIRCLE]:     yourCircleRef,
-    [FRIENDS_SECTION_IDS.REQUESTS]:        requestsRef,
-  }
-
-  const handleSelectSection = useCallback((sectionId) => {
-    setActiveSection(sectionId)
-    const ref = sectionRefs[sectionId]?.current
-    if (ref) {
-      ref.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }
-  }, [])
-
-  const handleAccept  = (id) => setRequests((r) => r.filter((req) => req.id !== id))
+  const handleAccept = (id) => setRequests((r) => r.filter((req) => req.id !== id))
   const handleDecline = (id) => setRequests((r) => r.filter((req) => req.id !== id))
 
   return (
-    <div className="relative w-[360px] h-[640px] overflow-hidden bg-[#0D1F16] flex flex-col">
+    <div
+      className="relative w-[360px] h-[640px] overflow-hidden flex flex-col"
+      style={{ background: t.bg, transition: 'background 0.3s ease' }}
+    >
 
       {/* ── Side menu ── */}
       <SideMenu
         open={menuOpen}
         onClose={() => setMenuOpen(false)}
-        activeSection={activeSection}
-        onSelectSection={handleSelectSection}
       />
 
       {/* ── Header ── */}
-      <div className="flex-shrink-0 px-4 flex items-center gap-3" style={{ paddingTop: 56 }}>
-        <motion.button
-          whileTap={{ scale: 0.88 }}
-          onClick={() => setMenuOpen(true)}
-          className="flex-shrink-0 bg-transparent border-none cursor-pointer p-2 -m-2"
-          aria-label="Open menu"
-        >
-          <span style={{ fontSize: 22, lineHeight: 1 }}>☰</span>
-        </motion.button>
-        <div className="flex-1 min-w-0">
-          <h1 style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 700, fontSize: 20, color: '#fff', marginBottom: 2 }}>
-            Your People 👥
+      <div className="flex-shrink-0 px-4" style={{ paddingTop: 56 }}>
+        {/* Top row: hamburger + title + Add Friends */}
+        <div className="flex items-center gap-2">
+          <motion.button
+            whileTap={{ scale: 0.88 }}
+            onClick={() => setMenuOpen(true)}
+            className="flex-shrink-0 bg-transparent border-none cursor-pointer p-1"
+            aria-label="Open menu"
+          >
+            <span style={{ fontSize: 20, lineHeight: 1, color: t.textPrimary }}>☰</span>
+          </motion.button>
+          <h1 style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 700, fontSize: 16, color: t.textPrimary, whiteSpace: 'nowrap', flex: 1 }}>
+            Activity from Friends 👥
           </h1>
-          <p style={{ fontFamily: "'Roboto', sans-serif", fontWeight: 400, fontSize: 13, color: '#74C69D' }}>
+          <motion.button
+            whileTap={{ scale: 0.95 }}
+            onClick={() => navigate('/find-friends')}
+            className="border-none cursor-pointer flex-shrink-0"
+            style={{
+              background: '#2D6A4F',
+              borderRadius: 8,
+              padding: '5px 10px',
+              fontFamily: "'Poppins', sans-serif",
+              fontSize: 10,
+              fontWeight: 600,
+              color: '#fff',
+            }}
+          >
+            + Add Friends
+          </motion.button>
+        </div>
+        {/* Subtitle row: text + search icon */}
+        <div className="flex items-center justify-between mt-1" style={{ paddingLeft: 28 }}>
+          <p style={{ fontFamily: "'Roboto', sans-serif", fontWeight: 400, fontSize: 12, color: t.sprout }}>
             See where your people are growing 🌿
           </p>
+          <motion.button
+            whileTap={{ scale: 0.88 }}
+            onClick={() => navigate('/friends/search')}
+            className="flex-shrink-0 border-none cursor-pointer flex items-center justify-center"
+            style={{
+              width: 30, height: 30,
+              background: 'rgba(45,106,79,0.15)',
+              border: `1px solid ${t.inputBorder}`,
+              borderRadius: 8,
+              fontSize: 14,
+            }}
+            aria-label="Search friends"
+          >
+            🔍
+          </motion.button>
         </div>
-        <motion.button
-          whileTap={{ scale: 0.95 }}
-          onClick={() => navigate('/find-friends')}
-          className="border-none cursor-pointer rounded-[8px] px-3 py-1.5 flex-shrink-0"
-          style={{
-            background: '#2D6A4F',
-            fontFamily: "'Poppins', sans-serif",
-            fontSize: 11,
-            fontWeight: 600,
-            color: '#fff',
-          }}
-        >
-          + Find Friends
-        </motion.button>
       </div>
 
       {/* ── Scrollable body ── */}
@@ -354,10 +378,10 @@ export default function FriendsPage() {
         style={{ paddingBottom: 80, scrollbarWidth: 'none' }}
       >
         {/* Section 1: Recent Activity */}
-        <div id="recent-activity" ref={recentActivityRef}>
-          <SectionHeader>🌱 Recent Activity</SectionHeader>
+        <div id="recent-activity">
+          <SectionHeader onSeeAll={() => navigate('/friends/activity')}>🌱 Recent Activity</SectionHeader>
           <div className="mb-5">
-            {RECENT_ACTIVITY.map((item, i) => (
+            {RECENT_ACTIVITY.slice(0, 3).map((item, i) => (
               <ActivityItem
                 key={item.id}
                 item={item}
@@ -369,27 +393,27 @@ export default function FriendsPage() {
         </div>
 
         {/* Section 2: Friends' Trees */}
-        <div id="friend-trees" ref={friendTreesRef}>
-          <SectionHeader>Friends&apos; Trees 🌳</SectionHeader>
+        <div id="friend-trees">
+          <SectionHeader onSeeAll={() => navigate('/friends/trees')}>Friends&apos; Trees 🌳</SectionHeader>
           <div className="mb-5">
-            {FRIEND_TREES.map((post, i) => (
+            {FRIEND_TREES.slice(0, 3).map((post, i) => (
               <FriendTreeCard key={post.id} post={post} index={i} />
             ))}
           </div>
         </div>
 
         {/* Section 3: Your Circle */}
-        <div id="your-circle" ref={yourCircleRef}>
-          <SectionHeader>👤 Your Circle</SectionHeader>
+        <div id="your-circle">
+          <SectionHeader onSeeAll={() => navigate('/friends/circle')}>👤 Your Circle</SectionHeader>
           <div className="mb-5">
-            {MY_CIRCLE.map((friend, i) => (
+            {MY_CIRCLE.slice(0, 3).map((friend, i) => (
               <CircleItem key={friend.id} friend={friend} index={i} />
             ))}
           </div>
         </div>
 
         {/* Section 4: Requests */}
-        <div id="requests" ref={requestsRef}>
+        <div id="requests">
           <AnimatePresence>
             {requests.length > 0 && (
               <motion.div
@@ -397,7 +421,7 @@ export default function FriendsPage() {
                 exit={{ opacity: 0, height: 0 }}
                 transition={{ duration: 0.2 }}
               >
-                <SectionHeader>🔔 Requests</SectionHeader>
+                <SectionHeader onSeeAll={() => navigate('/friends/requests')}>🔔 Requests</SectionHeader>
                 {requests.map((req, i) => (
                   <RequestItem
                     key={req.id}

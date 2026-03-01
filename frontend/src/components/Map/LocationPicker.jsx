@@ -5,11 +5,11 @@ import { motion, AnimatePresence } from 'framer-motion'
 
 const NEIGHBORHOODS = [
   { name: 'West Philadelphia', lat: 39.9526, lng: -75.1652 },
-  { name: 'North Philly',      lat: 39.9840, lng: -75.1530 },
-  { name: 'South Philly',      lat: 39.9176, lng: -75.1652 },
-  { name: 'Fishtown',          lat: 39.9737, lng: -75.1343 },
-  { name: 'Germantown',        lat: 40.0376, lng: -75.1721 },
-  { name: 'Center City',       lat: 39.9526, lng: -75.1635 },
+  { name: 'North Philly', lat: 39.9840, lng: -75.1530 },
+  { name: 'South Philly', lat: 39.9176, lng: -75.1652 },
+  { name: 'Fishtown', lat: 39.9737, lng: -75.1343 },
+  { name: 'Germantown', lat: 40.0376, lng: -75.1721 },
+  { name: 'Center City', lat: 39.9526, lng: -75.1635 },
 ]
 
 // ─── LocationPicker ───────────────────────────────────────────────────────────
@@ -69,7 +69,7 @@ export default function LocationPicker({ open, onClose, onLocationChange, curren
                 marginBottom: 4,
               }}
             >
-              Explore a neighborhood 📍
+              Explore a community 📍
             </p>
             <p
               style={{
@@ -103,7 +103,7 @@ export default function LocationPicker({ open, onClose, onLocationChange, curren
                     fontSize: 13,
                     color: '#fff',
                   }}
-                  placeholder="Search neighborhood..."
+                  placeholder="Search community..."
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   // eslint-disable-next-line jsx-a11y/no-autofocus
@@ -147,7 +147,7 @@ export default function LocationPicker({ open, onClose, onLocationChange, curren
                     padding: '8px 0',
                   }}
                 >
-                  No neighborhoods found
+                  No communities found
                 </p>
               )}
             </div>

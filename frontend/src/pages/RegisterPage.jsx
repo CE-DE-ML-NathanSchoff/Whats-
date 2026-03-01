@@ -10,22 +10,13 @@ const baseInput = 'w-full h-full px-3 bg-white rounded-[5px] text-[17px] text-[#
 
 const USER_TYPES = [
   {
-    id: 'visitor',
+    id: 'user',
     icon: '🧭',
-    title: 'Visitor',
-    subtitle: 'Exploring the neighborhood',
+    title: 'User',
+    subtitle: 'Exploring the community',
     borderSelected: '#74C69D',
     bgSelected: 'rgba(116,198,157,0.1)',
     dotColor: '#74C69D',
-  },
-  {
-    id: 'local',
-    icon: '🏡',
-    title: 'Local',
-    subtitle: 'I live in this community',
-    borderSelected: '#52B788',
-    bgSelected: 'rgba(82,183,136,0.1)',
-    dotColor: '#52B788',
   },
   {
     id: 'business',
@@ -104,7 +95,7 @@ export default function RegisterPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
-  const [selectedType,  setSelectedType]  = useState('local')
+  const [selectedType,  setSelectedType]  = useState('user')
   const [businessName,  setBusinessName]  = useState('')
   const [loading,       setLoading]       = useState(false)
   const [errorMsg,      setErrorMsg]      = useState('')
@@ -137,7 +128,7 @@ export default function RegisterPage() {
       }
       console.log('Register:', formData)
       setSession({ user: { email, user_metadata: { full_name: name, area, user_type: selectedType } } })
-      navigate('/map')
+      navigate('/onboarding')
     }, 1000)
   }
 
@@ -176,7 +167,7 @@ export default function RegisterPage() {
           <Field label="Name">
             <input
               type="text"
-              placeholder="E.g: Arjun Das"
+              placeholder="E.g: John Cena"
               className={baseInput}
               style={inputStyle}
               value={name}
@@ -200,7 +191,7 @@ export default function RegisterPage() {
               />
             </div>
             <p style={{ fontFamily: "'Roboto', sans-serif", fontWeight: 400, fontSize: 11, color: '#74C69D', marginTop: 4 }}>
-              Enter your neighborhood, street, or local area
+              Enter your city, street, or local area
             </p>
           </div>
 
