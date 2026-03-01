@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Requires Bash (for arrays). Re-exec with bash if run via sh.
+[ -z "$BASH_VERSION" ] && exec bash "$0" "$@"
+
 set -e
 
 IMAGE="${IMAGE:-ghcr.io/ce-de-ml-nathanschoff/whats:backend-docker}"
