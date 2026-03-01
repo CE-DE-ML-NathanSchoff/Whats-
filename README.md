@@ -59,7 +59,7 @@ JavaScript backend for **Comunitree**, with user accounts and Snowflake for data
 
 ## API
 
-Base URL: `http://localhost:3000` (or your `PORT`).
+Base URL: `http://localhost:8000` (or your `PORT`). The server listens on port 8000 by default for reverse-proxy setups.
 
 ### Auth
 
@@ -109,3 +109,29 @@ Use `Authorization: Bearer <token>` for protected routes.
 Data is stored in Snowflake using the official [Node.js driver](https://docs.snowflake.com/en/developer-guide/node-js/nodejs-driver). The app uses a connection pool; ensure the configured warehouse and database exist and the user has privileges to create tables and run DML.
 
 To add more user fields later, extend the `users` table in Snowflake (e.g. `ALTER TABLE users ADD COLUMN ...`) and update `src/services/userService.js` and validation in the routes.
+
+## Running with Docker
+
+The app listens on **port 8000** so a reverse proxy can point to it reliably.
+
+### Build locally
+
+```bash
+docker build -t comunitree .
+docker run -p 8000:8000 --env-file .env comunitree
+```
+
+Pass all required env vars at runtime (see [.env.example](.env.example)) via `-e`, `--env-file`, or your orchestrator’s config. The image does not include `.env` or secrets.
+
+### Pull from GitHub Container Registry
+
+On every push to `main` or `master`, the image is built and pushed to GHCR. Replace `<owner>` and `<repo>` with your GitHub org/repo (e.g. `myorg/Whats-`):
+
+```bash
+docker pull ghcr.io/<owner>/<repo>:latest
+docker run -p 8000:8000 -e JWT_SECRET=... -e SNOWFLAKE_ACCOUNT=... ... ghcr.io/<owner>/<repo>:latest
+```
+
+For a private repo, run `docker login ghcr.io` with a GitHub PAT (or GitHub CLI) before pulling.
+
+**Note:** DB init and migrations are not run inside the container. Run `npm run init-db` (and any migrate/seed scripts) once from a host or one-off container that can reach the same Snowflake instance.

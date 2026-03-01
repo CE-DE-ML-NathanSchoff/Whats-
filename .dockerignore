@@ -1,0 +1,12 @@
+node_modules
+.env
+.env.*
+.git
+.github
+*.md
+.vscode
+.cursorignore
+.cursorindexingignore
+.DS_Store
+npm-debug.log*
+.npm
