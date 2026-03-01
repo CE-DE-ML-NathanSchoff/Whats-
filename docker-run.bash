@@ -205,12 +205,12 @@ debug "Step 7: Running container"
 DETACH="-d"
 [ "$FOREGROUND" = "1" ] && DETACH=""
 
-echo "Starting Comunitree on port $PORT..."
+echo "Starting Comunitree (frontend $PORT, backend 7000)..."
 if [ "$FOREGROUND" = "1" ]; then
-  exec docker run -p "${PORT}:8000" --name "$CONTAINER_NAME" --env-file "$ENV_FILE" --rm $DETACH "$IMAGE"
+  exec docker run -p "${PORT}:8000" -p "7000:7000" --name "$CONTAINER_NAME" --env-file "$ENV_FILE" --rm $DETACH "$IMAGE"
 fi
 
-RUN_ERR=$(docker run $DETACH -p "${PORT}:8000" --name "$CONTAINER_NAME" --env-file "$ENV_FILE" --restart unless-stopped "$IMAGE" 2>&1); RUN_RET=$?
+RUN_ERR=$(docker run $DETACH -p "${PORT}:8000" -p "7000:7000" --name "$CONTAINER_NAME" --env-file "$ENV_FILE" --restart unless-stopped "$IMAGE" 2>&1); RUN_RET=$?
 if [ "$RUN_RET" -ne 0 ]; then
   dbg_log "step_failed" "\"step\":7,\"error\":\"$(sanitize_err "$RUN_ERR")\""
   echo "Error: failed to run container" >&2
@@ -221,8 +221,9 @@ fi
 
 echo ""
 echo "Comunitree is running."
-echo "  URL:    http://localhost:${PORT}"
-echo "  Logs:   docker logs -f $CONTAINER_NAME"
+echo "  Frontend: http://localhost:${PORT}"
+echo "  Backend:  http://localhost:7000"
+echo "  Logs:     docker logs -f $CONTAINER_NAME"
 echo "  Stop:   docker stop $CONTAINER_NAME"
 echo "  Attach: ./docker-run.bash --foreground"
 echo ""

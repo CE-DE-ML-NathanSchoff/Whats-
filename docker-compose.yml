@@ -3,6 +3,7 @@ services:
     image: ghcr.io/ce-de-ml-nathanschoff/whats:main
     ports:
       - "8000:8000"
+      - "7000:7000"
     env_file:
       - .env
     restart: unless-stopped

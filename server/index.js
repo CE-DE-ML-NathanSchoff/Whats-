@@ -4,6 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import express from 'express';
 import cors from 'cors';
+import { createProxyMiddleware } from 'http-proxy-middleware';
 import { Server as SocketIOServer } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import authRoutes from './routes/auth.js';
@@ -14,11 +15,14 @@ import eventRoutes from './routes/events.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const app = express();
-const httpServer = createServer(app);
-const PORT = process.env.PORT || 8000;
+const PORT = Number(process.env.PORT) || 7000;
+const FRONTEND_PORT = process.env.FRONTEND_PORT ? Number(process.env.FRONTEND_PORT) : null;
 const BASE_PATH = (process.env.BASE_PATH || '').replace(/\/$/, '');
 const JWT_SECRET = process.env.JWT_SECRET || 'change-me-in-production';
+const clientDist = path.join(__dirname, '..', 'client', 'dist');
+
+const app = express();
+const httpServer = createServer(app);
 
 const io = new SocketIOServer(httpServer, {
   cors: { origin: '*', methods: ['GET', 'POST'] },
@@ -75,17 +79,43 @@ router.use('/events', eventRoutes);
 
 app.use(BASE_PATH || '/', router);
 
-// Serve frontend static files in production
-const clientDist = path.join(__dirname, '..', 'client', 'dist');
-app.use(express.static(clientDist));
-app.get('*', (req, res) => {
-  res.sendFile(path.join(clientDist, 'index.html'));
-});
-
 app.use((err, req, res, next) => {
   console.error(err);
   res.status(500).json({ error: 'Internal server error' });
 });
+
+// Single-port mode: serve frontend from same server
+function serveFrontendFromBackend() {
+  app.use(express.static(clientDist));
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(clientDist, 'index.html'));
+  });
+}
+
+if (FRONTEND_PORT) {
+  // Two-port mode: backend on PORT (7000), frontend on FRONTEND_PORT (8000) with proxy
+  const backendOrigin = `http://127.0.0.1:${PORT}`;
+  const frontendApp = express();
+  frontendApp.use('/auth', createProxyMiddleware({ target: backendOrigin, changeOrigin: true }));
+  frontendApp.use('/users', createProxyMiddleware({ target: backendOrigin, changeOrigin: true }));
+  frontendApp.use('/communities', createProxyMiddleware({ target: backendOrigin, changeOrigin: true }));
+  frontendApp.use('/events', createProxyMiddleware({ target: backendOrigin, changeOrigin: true }));
+  frontendApp.use('/health', createProxyMiddleware({ target: backendOrigin, changeOrigin: true }));
+  frontendApp.use('/socket.io', createProxyMiddleware({ target: backendOrigin, changeOrigin: true, ws: true }));
+  frontendApp.use(express.static(clientDist));
+  frontendApp.get('*', (req, res) => {
+    res.sendFile(path.join(clientDist, 'index.html'));
+  });
+  const frontendServer = createServer(frontendApp);
+  frontendServer.listen(FRONTEND_PORT, () => {
+    console.log(`Comunitree frontend running on http://localhost:${FRONTEND_PORT}`);
+  }).on('error', (err) => {
+    console.error('Failed to start frontend server:', err);
+    process.exit(1);
+  });
+} else {
+  serveFrontendFromBackend();
+}
 
 httpServer.listen(PORT, () => {
   console.log(`Comunitree backend running on http://localhost:${PORT}`);

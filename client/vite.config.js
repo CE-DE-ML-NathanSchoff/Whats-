@@ -6,13 +6,13 @@ export default defineConfig({
   plugins: [tailwindcss(), react()],
   server: {
     proxy: {
-      '/auth': 'http://localhost:8000',
-      '/users': 'http://localhost:8000',
-      '/communities': 'http://localhost:8000',
-      '/events': 'http://localhost:8000',
-      '/health': 'http://localhost:8000',
+      '/auth': 'http://localhost:7000',
+      '/users': 'http://localhost:7000',
+      '/communities': 'http://localhost:7000',
+      '/events': 'http://localhost:7000',
+      '/health': 'http://localhost:7000',
       '/socket.io': {
-        target: 'http://localhost:8000',
+        target: 'http://localhost:7000',
         ws: true,
       },
     },

@@ -14,7 +14,8 @@ COPY server/ ./server/
 COPY --from=frontend-build /app/client/dist ./client/dist
 
 USER node
-EXPOSE 8000
+EXPOSE 7000 8000
+ENV PORT=7000 FRONTEND_PORT=8000
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
   CMD wget -q -O /dev/null http://localhost:8000/health || exit 1
