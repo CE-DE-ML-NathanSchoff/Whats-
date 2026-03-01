@@ -1,4 +1,9 @@
 import snowflake from 'snowflake-sdk';
+import fs from 'fs';
+
+// #region agent log
+const _dbgLogSf=(loc,msg,data)=>{try{const p='/Users/lucian/Cursor/HenHacks/Whats-/.cursor/debug-c2a6d2.log';try{fs.mkdirSync('/Users/lucian/Cursor/HenHacks/Whats-/.cursor',{recursive:true});}catch(_){}fs.appendFileSync(p,JSON.stringify({sessionId:'c2a6d2',location:loc,message:msg,data,timestamp:Date.now()})+'\n');}catch(_){}};
+// #endregion
 
 const useBrowserAuth = process.env.SNOWFLAKE_AUTHENTICATOR === 'EXTERNALBROWSER';
 const useKeyPairAuth = process.env.SNOWFLAKE_AUTHENTICATOR === 'SNOWFLAKE_JWT';
@@ -46,6 +51,10 @@ const connectionOptions = {
   ...(useBrowserAuth && { disableConsoleLogin: false }),
   ...(useBrowserAuth && { browserActionTimeout: 300000 }),
 };
+
+// #region agent log
+_dbgLogSf('snowflake.js:module','connection_options',{hypothesisId:'H-B,H-D',authenticator:connectionOptions.authenticator,hasPassword:!!connectionOptions.password,hasPasscode:!!connectionOptions.passcode,hasPrivateKeyPath:!!connectionOptions.privateKeyPath,privateKeyPath:connectionOptions.privateKeyPath||null,hasPrivateKey:!!connectionOptions.privateKey,useKeyPairAuth,useBrowserAuth,account:connectionOptions.account,username:connectionOptions.username});
+// #endregion
 
 const poolOptions = {
   max: 10,

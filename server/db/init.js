@@ -8,6 +8,10 @@ import readline from 'readline';
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
+// #region agent log
+const _dbgLog=(loc,msg,data)=>{try{fs.mkdirSync(path.dirname('/Users/lucian/Cursor/HenHacks/Whats-/.cursor/debug-c2a6d2.log'),{recursive:true});fs.appendFileSync('/Users/lucian/Cursor/HenHacks/Whats-/.cursor/debug-c2a6d2.log',JSON.stringify({sessionId:'c2a6d2',location:loc,message:msg,data,timestamp:Date.now()})+'\n');}catch(_){}};
+// #endregion
+
 /** If using MFA without passcode in .env, prompt for it so we set it before loading snowflake config. */
 function promptForMfaPasscode() {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
@@ -50,14 +54,52 @@ async function setupKeyPair(execute, keyPath) {
   const escapedPem = publicKeyPem.replace(/'/g, "''").replace(/\r?\n/g, '\\n');
   const snowflakeUser = username.toUpperCase().replace(/"/g, '');
   const sql = `ALTER USER ${snowflakeUser} SET RSA_PUBLIC_KEY = '${escapedPem}'`;
-  await execute(sql);
+  // #region agent log
+  _dbgLog('init.js:setupKeyPair','alter_user_sql',{hypothesisId:'H-A,H-E',publicKeyPemStart:publicKeyPem.substring(0,80),escapedPemStart:escapedPem.substring(0,80),escapedPemEnd:escapedPem.substring(escapedPem.length-60),sqlStart:sql.substring(0,120),keyPath});
+  // #endregion
+  try {
+    await execute(sql);
+  } catch (sqlErr) {
+    // #region agent log
+    _dbgLog('init.js:setupKeyPair','alter_user_FAILED',{hypothesisId:'H-A',error:sqlErr.message,sqlStart:sql.substring(0,120)});
+    // #endregion
+    throw sqlErr;
+  }
   console.log('Public key registered for user', username);
   const dir = path.dirname(keyPath);
+  // #region agent log
+  _dbgLog('init.js:setupKeyPair','pre_write',{hypothesisId:'H-C,H-E',keyPath,dir,dirExists:fs.existsSync(dir)});
+  // #endregion
   if (dir && !fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+    } catch (mkdirErr) {
+      // #region agent log
+      _dbgLog('init.js:setupKeyPair','mkdir_FAILED',{hypothesisId:'H-C',dir,error:mkdirErr.message});
+      // #endregion
+      throw mkdirErr;
+    }
   }
-  fs.writeFileSync(keyPath, privateKeyPem, { mode: 0o600 });
-  console.log('Private key written to', keyPath);
+  try {
+    fs.writeFileSync(keyPath, privateKeyPem, { mode: 0o600 });
+    // #region agent log
+    _dbgLog('init.js:setupKeyPair','key_written_OK',{hypothesisId:'H-C',keyPath,fileExists:fs.existsSync(keyPath)});
+    // #endregion
+    console.log('Private key written to', keyPath);
+  } catch (writeErr) {
+    const fallback = path.join(process.cwd(), 'snowflake_rsa_key.p8');
+    if (fallback !== keyPath) {
+      try {
+        fs.writeFileSync(fallback, privateKeyPem, { mode: 0o600 });
+        console.log('Could not write to', keyPath, '(e.g. permission denied). Wrote to', fallback);
+        console.log('Set SNOWFLAKE_PRIVATE_KEY_PATH=' + fallback + ' in .env and ensure the app can read it.');
+      } catch (_) {
+        throw new Error(`Cannot write private key to ${keyPath}: ${writeErr.message}. Ensure the directory exists and is writable (e.g. Docker volume).`);
+      }
+    } else {
+      throw new Error(`Cannot write private key to ${keyPath}: ${writeErr.message}`);
+    }
+  }
 }
 
 const USERS_TABLE = `
@@ -254,28 +296,51 @@ async function runSchema(execute) {
 async function init() {
   const keyPath = getPrivateKeyPath();
   const useJwt = process.env.SNOWFLAKE_AUTHENTICATOR === 'SNOWFLAKE_JWT';
-  const keyExists = fs.existsSync(keyPath) || !!process.env.SNOWFLAKE_PRIVATE_KEY?.trim();
+  // Key exists only if: file at path exists, OR we have inline key (and we're not using path)
+  const pathSet = !!process.env.SNOWFLAKE_PRIVATE_KEY_PATH?.trim();
+  const keyExists = pathSet ? fs.existsSync(keyPath) : !!process.env.SNOWFLAKE_PRIVATE_KEY?.trim();
 
-  if (useJwt && !keyExists) {
+  const needsKeySetup = useJwt && !keyExists;
+  // #region agent log
+  _dbgLog('init.js:init','env_state',{hypothesisId:'H-A,H-B,H-C,H-D',authenticator:process.env.SNOWFLAKE_AUTHENTICATOR,keyPath,useJwt,pathSet,keyExists,needsKeySetup,hasPasscode:!!process.env.SNOWFLAKE_PASSCODE,hasPassword:!!process.env.SNOWFLAKE_PASSWORD,account:process.env.SNOWFLAKE_ACCOUNT,username:process.env.SNOWFLAKE_USERNAME,isTTY:!!process.stdin.isTTY});
+  // #endregion
+
+  if (needsKeySetup) {
     console.log('Key-pair auth is set but no key file found. Will connect with MFA once to create and register a key, then create the schema.');
     process.env.SNOWFLAKE_AUTHENTICATOR = 'USERNAME_PASSWORD_MFA';
-    if (!process.env.SNOWFLAKE_PASSCODE) {
+    // Unset path so snowflake config won't try to read non-existent file
+    delete process.env.SNOWFLAKE_PRIVATE_KEY_PATH;
+    if (!process.env.SNOWFLAKE_PASSCODE?.trim()) {
+      if (!process.stdin.isTTY) {
+        console.error('Cannot prompt for MFA: stdin is not a TTY. Set SNOWFLAKE_PASSCODE in .env or run with -it (e.g. docker run -it ...).');
+        process.exit(1);
+      }
       process.env.SNOWFLAKE_PASSCODE = await promptForMfaPasscode();
     }
-  } else if (process.env.SNOWFLAKE_AUTHENTICATOR === 'USERNAME_PASSWORD_MFA' && !process.env.SNOWFLAKE_PASSCODE) {
+    // #region agent log
+    _dbgLog('init.js:needsKeySetup','after_mfa_prompt',{hypothesisId:'H-B',newAuth:process.env.SNOWFLAKE_AUTHENTICATOR,hasPasscode:!!process.env.SNOWFLAKE_PASSCODE,keyPathDeleted:!process.env.SNOWFLAKE_PRIVATE_KEY_PATH});
+    // #endregion
+  } else if (process.env.SNOWFLAKE_AUTHENTICATOR === 'USERNAME_PASSWORD_MFA' && !process.env.SNOWFLAKE_PASSCODE?.trim()) {
+    if (!process.stdin.isTTY) {
+      console.error('Cannot prompt for MFA: stdin is not a TTY. Set SNOWFLAKE_PASSCODE in .env or run with -it.');
+      process.exit(1);
+    }
     process.env.SNOWFLAKE_PASSCODE = await promptForMfaPasscode();
   }
 
   const { execute } = await import('../config/snowflake.js');
 
   try {
-    if (useJwt && !keyExists) {
+    if (needsKeySetup) {
       await setupKeyPair(execute, keyPath);
       console.log('Key-pair setup complete. Future runs (and the app) can use SNOWFLAKE_AUTHENTICATOR=SNOWFLAKE_JWT and SNOWFLAKE_PRIVATE_KEY_PATH=' + keyPath);
     }
     await runSchema(execute);
     console.log('Comunitree DB init done.');
   } catch (err) {
+    // #region agent log
+    _dbgLog('init.js:init','INIT_FAILED',{error:err.message,stack:err.stack?.substring(0,500)});
+    // #endregion
     console.error('Init failed:', err.message);
     process.exit(1);
   }
