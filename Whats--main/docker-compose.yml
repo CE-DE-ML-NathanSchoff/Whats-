@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  web:
+    # Tells Docker to use the Dockerfile in the current folder
+    build: .
+    # Give the container a recognizable name
+    container_name: fastapi_app
+    ports:
+      - "8000:8000"
+    volumes:
+      # Maps your local 'data' folder to the container
+      # Useful for SQLite databases or uploaded files
+      - ./data:/app/data
+    environment:
+      # Common Python environment settings
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
