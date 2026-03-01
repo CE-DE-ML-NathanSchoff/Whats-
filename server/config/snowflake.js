@@ -26,7 +26,7 @@ function getPrivateKeyOption() {
   return { privateKey: pem };
 }
 
-const keyPairOpts = useKeyPairAuth ? getPrivateKeyOption() : null;
+let keyPairOpts = useKeyPairAuth ? getPrivateKeyOption() : null;
 
 const connectionOptions = {
   account: process.env.SNOWFLAKE_ACCOUNT,
@@ -37,15 +37,44 @@ const connectionOptions = {
   schema: process.env.SNOWFLAKE_SCHEMA || 'PUBLIC',
   role: process.env.SNOWFLAKE_ROLE || 'ACCOUNTADMIN',
   application: 'COMUNITREE_BACKEND',
-  // MFA: SNOWFLAKE_AUTHENTICATOR=USERNAME_PASSWORD_MFA + SNOWFLAKE_PASSCODE (prompted on --init-db if unset)
-  // Key-pair (24/7): SNOWFLAKE_AUTHENTICATOR=SNOWFLAKE_JWT + SNOWFLAKE_PRIVATE_KEY or SNOWFLAKE_PRIVATE_KEY_PATH
-  // Browser: SNOWFLAKE_AUTHENTICATOR=EXTERNALBROWSER
   ...(process.env.SNOWFLAKE_AUTHENTICATOR && { authenticator: process.env.SNOWFLAKE_AUTHENTICATOR }),
   ...(process.env.SNOWFLAKE_PASSCODE && { passcode: process.env.SNOWFLAKE_PASSCODE }),
   ...(keyPairOpts && keyPairOpts),
   ...(useBrowserAuth && { disableConsoleLogin: false }),
   ...(useBrowserAuth && { browserActionTimeout: 300000 }),
 };
+
+/**
+ * Rebuild connectionOptions from current process.env and reset the pool.
+ * Call after changing auth mode at runtime (e.g. switching from MFA to JWT
+ * after key-pair setup in init.js).
+ */
+export function reconfigure() {
+  const nowKeyPair = process.env.SNOWFLAKE_AUTHENTICATOR === 'SNOWFLAKE_JWT';
+  const nowBrowser = process.env.SNOWFLAKE_AUTHENTICATOR === 'EXTERNALBROWSER';
+  const newKeyOpts = nowKeyPair ? getPrivateKeyOption() : null;
+
+  for (const k of Object.keys(connectionOptions)) delete connectionOptions[k];
+  Object.assign(connectionOptions, {
+    account: process.env.SNOWFLAKE_ACCOUNT,
+    username: process.env.SNOWFLAKE_USERNAME,
+    password: process.env.SNOWFLAKE_PASSWORD,
+    warehouse: process.env.SNOWFLAKE_WAREHOUSE || 'COMPUTE_WH',
+    database: process.env.SNOWFLAKE_DATABASE || 'COMUNITREE',
+    schema: process.env.SNOWFLAKE_SCHEMA || 'PUBLIC',
+    role: process.env.SNOWFLAKE_ROLE || 'ACCOUNTADMIN',
+    application: 'COMUNITREE_BACKEND',
+    ...(process.env.SNOWFLAKE_AUTHENTICATOR && { authenticator: process.env.SNOWFLAKE_AUTHENTICATOR }),
+    ...(process.env.SNOWFLAKE_PASSCODE && { passcode: process.env.SNOWFLAKE_PASSCODE }),
+    ...(newKeyOpts && newKeyOpts),
+    ...(nowBrowser && { disableConsoleLogin: false }),
+    ...(nowBrowser && { browserActionTimeout: 300000 }),
+  });
+
+  pool = null;
+  browserConn = null;
+  browserConnPromise = null;
+}
 
 const poolOptions = {
   max: 10,
@@ -162,4 +191,4 @@ export async function query(sqlText, binds = []) {
   return rows;
 }
 
-export default { getPool, execute, query };
+export default { getPool, execute, query, reconfigure };

@@ -301,12 +301,20 @@ async function init() {
     process.env.SNOWFLAKE_PASSCODE = await promptForMfaPasscode();
   }
 
-  const { execute } = await import('../config/snowflake.js');
+  const { execute, reconfigure } = await import('../config/snowflake.js');
 
   try {
     if (needsKeySetup) {
       await setupKeyPair(execute, keyPath);
       console.log('Key-pair setup complete. Future runs (and the app) can use SNOWFLAKE_AUTHENTICATOR=SNOWFLAKE_JWT and SNOWFLAKE_PRIVATE_KEY_PATH=' + keyPath);
+
+      // Switch the pool to JWT so runSchema() doesn't create new connections
+      // with the now-expired MFA/TOTP credentials.
+      process.env.SNOWFLAKE_AUTHENTICATOR = 'SNOWFLAKE_JWT';
+      process.env.SNOWFLAKE_PRIVATE_KEY_PATH = keyPath;
+      delete process.env.SNOWFLAKE_PASSCODE;
+      reconfigure();
+      console.log('Switched connection pool to SNOWFLAKE_JWT auth.');
     }
     await runSchema(execute);
     console.log('Comunitree DB init done.');

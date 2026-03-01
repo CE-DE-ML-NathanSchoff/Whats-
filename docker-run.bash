@@ -214,35 +214,64 @@ if [ "$RUN_INIT_DB" = "1" ]; then
   INIT_RET=$?
   set -e
 
-  # #region agent log
-  echo "{\"sessionId\":\"843cca\",\"hypothesisId\":\"H1_H2\",\"location\":\"docker-run.bash:step4_post\",\"message\":\"init_exit\",\"data\":{\"exit_code\":${INIT_RET}},\"timestamp\":$(date +%s)000}" >> "$DEBUG_LOG"
-  # #endregion
-
-  if [ "$INIT_RET" -ne 0 ]; then
-    docker rm "$INIT_CONTAINER" >/dev/null 2>&1 || true
-    dbg_log "step_failed" "\"step\":4,\"error\":\"init-db exited with code $INIT_RET\""
-    echo "DB init failed (exit code $INIT_RET). Fix .env (Snowflake credentials or MFA) and run again with --init-db." >&2
-    exit 1
-  fi
-
-  # Copy the key file out of the stopped container, then remove it
+  # Always extract the key BEFORE checking exit code — the key may have been
+  # generated successfully even if a later step (e.g. second pool connection)
+  # failed with TOTP Invalid.
   docker cp "${INIT_CONTAINER}:/tmp/snowflake_rsa_key.p8" "$TEMP_KEY_FILE" 2>/dev/null
   CP_RET=$?
   docker rm "$INIT_CONTAINER" >/dev/null 2>&1 || true
 
   # #region agent log
-  echo "{\"sessionId\":\"843cca\",\"hypothesisId\":\"H1_H2\",\"location\":\"docker-run.bash:step4_cp\",\"message\":\"docker_cp_result\",\"data\":{\"cp_exit\":${CP_RET},\"file_exists\":\"$(test -f "$TEMP_KEY_FILE" && echo yes || echo no)\",\"file_size\":\"$(wc -c < "$TEMP_KEY_FILE" 2>/dev/null || echo 0)\"},\"timestamp\":$(date +%s)000}" >> "$DEBUG_LOG"
+  echo "{\"sessionId\":\"b9c3ac\",\"hypothesisId\":\"H1\",\"location\":\"docker-run.bash:step4_post\",\"message\":\"init_and_cp_result\",\"data\":{\"init_exit\":${INIT_RET},\"cp_exit\":${CP_RET},\"key_file_exists\":\"$(test -f "$TEMP_KEY_FILE" && echo yes || echo no)\",\"key_file_size\":\"$(wc -c < "$TEMP_KEY_FILE" 2>/dev/null || echo 0)\"},\"timestamp\":$(date +%s)000}" >> "$DBG_LOG"
   # #endregion
 
+  KEY_INJECTED=0
   if [ -f "$TEMP_KEY_FILE" ] && [ -s "$TEMP_KEY_FILE" ]; then
     KEY_PEM=$(cat "$TEMP_KEY_FILE")
     rm -f "$TEMP_KEY_FILE"
     inject_key_into_env "$KEY_PEM"
-    echo "DB init completed. Key saved to .env."
+    KEY_INJECTED=1
   else
     rm -f "$TEMP_KEY_FILE" 2>/dev/null || true
-    echo "DB init completed but no new key file was written." >&2
-    echo "  If key-pair auth was already set up, the existing SNOWFLAKE_PRIVATE_KEY in .env will be used." >&2
+  fi
+
+  if [ "$INIT_RET" -ne 0 ]; then
+    if [ "$KEY_INJECTED" = "1" ]; then
+      echo "Note: init-db exited with code $INIT_RET (likely expired TOTP on a second pool connection),"
+      echo "  but the RSA key pair was created and saved to .env successfully."
+      echo "  Re-running --init-db to finish schema setup with the new key..."
+      # #region agent log
+      echo "{\"sessionId\":\"b9c3ac\",\"hypothesisId\":\"H2\",\"location\":\"docker-run.bash:step4_retry\",\"message\":\"retrying_init_with_jwt\",\"timestamp\":$(date +%s)000}" >> "$DBG_LOG"
+      # #endregion
+      RETRY_CONTAINER=$(docker create \
+        --env-file "$ENV_FILE" \
+        "$IMAGE" node server/db/init.js)
+      set +e
+      docker start -ai "$RETRY_CONTAINER"
+      RETRY_RET=$?
+      set -e
+      docker rm "$RETRY_CONTAINER" >/dev/null 2>&1 || true
+      # #region agent log
+      echo "{\"sessionId\":\"b9c3ac\",\"hypothesisId\":\"H2\",\"location\":\"docker-run.bash:step4_retry_done\",\"message\":\"retry_result\",\"data\":{\"retry_exit\":${RETRY_RET}},\"timestamp\":$(date +%s)000}" >> "$DBG_LOG"
+      # #endregion
+      if [ "$RETRY_RET" -ne 0 ]; then
+        dbg_log "step_failed" "\"step\":4,\"error\":\"init-db retry exited with code $RETRY_RET\""
+        echo "DB init retry failed (exit code $RETRY_RET)." >&2
+        exit 1
+      fi
+      echo "DB init completed on retry. Key is saved to .env."
+    else
+      dbg_log "step_failed" "\"step\":4,\"error\":\"init-db exited with code $INIT_RET\""
+      echo "DB init failed (exit code $INIT_RET). Fix .env (Snowflake credentials or MFA) and run again with --init-db." >&2
+      exit 1
+    fi
+  else
+    if [ "$KEY_INJECTED" = "1" ]; then
+      echo "DB init completed. Key saved to .env."
+    else
+      echo "DB init completed but no new key file was written." >&2
+      echo "  If key-pair auth was already set up, the existing SNOWFLAKE_PRIVATE_KEY in .env will be used." >&2
+    fi
   fi
 fi
 
