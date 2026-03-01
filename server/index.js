@@ -85,6 +85,8 @@ router.get('/health', (req, res) => {
 });
 
 router.use('/auth', authRoutes);
+// Also mount auth at root so /register and /login work (avoids 404 when path is requested without /auth prefix)
+router.use('/', authRoutes);
 router.use('/users', userRoutes);
 router.use('/communities', communityRoutes);
 router.use('/events', eventRoutes);
@@ -130,9 +132,12 @@ if (FRONTEND_PORT) {
   // Two-port mode: backend on PORT (7000), frontend on FRONTEND_PORT (8000) with proxy
   const backendOrigin = `http://127.0.0.1:${PORT}`;
   const frontendApp = express();
-  // When BASE_PATH is set, redirect / to /communitree/ so users get the app instead of 404
+  // When BASE_PATH is set, redirect / to /communitree/ and proxy /register, /login, /auth, etc. so auth works
   if (BASE_PATH) {
     frontendApp.get('/', (req, res) => res.redirect(302, BASE_PATH + '/'));
+    frontendApp.use('/register', createProxyMiddleware({ target: backendOrigin, changeOrigin: true }));
+    frontendApp.use('/login', createProxyMiddleware({ target: backendOrigin, changeOrigin: true }));
+    frontendApp.use('/me', createProxyMiddleware({ target: backendOrigin, changeOrigin: true }));
     frontendApp.use('/auth', createProxyMiddleware({ target: backendOrigin, changeOrigin: true }));
     frontendApp.use('/users', createProxyMiddleware({ target: backendOrigin, changeOrigin: true }));
     frontendApp.use('/communities', createProxyMiddleware({ target: backendOrigin, changeOrigin: true }));
