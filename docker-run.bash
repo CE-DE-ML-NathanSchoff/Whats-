@@ -1,18 +1,25 @@
 #!/usr/bin/env bash
 # Run Comunitree in Docker: ensures .env, optional DB init/migrations, then runs the app.
-# Usage: ./docker-run.bash [--init-db] [--migrate] [--foreground]
+# Usage:
+#   ./docker-run.bash [--init-db] [--migrate] [--foreground]
+#   or: bash docker-run.bash [--init-db] [--migrate] [--foreground]  (if script not executable)
 #   --init-db   Run Snowflake schema init once (one-off container) then continue to run.
 #   --migrate   Run DB migrations (private/friends, profile/config) then continue to run.
 #   --foreground  Run container in foreground (no -d).
+# If you get "Permission denied", run: chmod +x docker-run.bash
 # Debug: DEBUG=1 ./docker-run.bash
+# Re-exec with bash if invoked via sh (dash doesn't support read -s/-p used in step 2).
+[ -z "${BASH_VERSION}" ] && exec bash "$0" "$@"
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 IMAGE="${IMAGE:-ghcr.io/ce-de-ml-nathanschoff/whats:main}"
 PORT="${PORT:-8000}"
 CONTAINER_NAME="${CONTAINER_NAME:-comunitree}"
 RUN_INIT_DB=0
 RUN_MIGRATE=0
 FOREGROUND=0
+SAVED_ARGS=("$@")
 while [ $# -gt 0 ]; do
   case "$1" in
     --init-db)   RUN_INIT_DB=1; shift ;;
@@ -23,6 +30,22 @@ while [ $# -gt 0 ]; do
 done
 
 debug() { [ -n "$DEBUG" ] && echo "[DEBUG] $*" >&2; }
+
+# #region agent log
+DBG_LOG="${SCRIPT_DIR}/.cursor/debug-841063.log"
+dbg_log() { mkdir -p "$(dirname "$DBG_LOG")" 2>/dev/null; echo "{\"sessionId\":\"841063\",\"message\":\"$1\",\"data\":{$2},\"timestamp\":$(( $(date +%s) * 1000 ))}" >> "$DBG_LOG" 2>/dev/null || true; }
+sanitize_err() { printf '%s' "$1" | tr '\n' ' ' | sed 's/"/\\"/g'; }
+show_docker_permission_hint() {
+  if echo "$1" | grep -qiE 'permission denied|not permitted|cannot connect to the Docker daemon'; then
+    echo "" >&2
+    echo "Docker reported a permission error. On this host you may need to:" >&2
+    echo "  • Run with sudo: sudo $0 ${SAVED_ARGS[*]}" >&2
+    echo "  • Or add your user to the docker group: sudo usermod -aG docker \$USER" >&2
+    echo "    then log out and back in (or newgrp docker), and run again without sudo." >&2
+    echo "" >&2
+  fi
+}
+# #endregion
 
 # --- Step 1: Check Docker ---
 debug "Step 1: Checking Docker"
@@ -103,19 +126,33 @@ if [ "$need_env_prompt" = "1" ]; then
 fi
 
 # --- Step 3: Pull image (needed for init/migrate and run) ---
+# #region agent log
+dbg_log "step_start" "\"step\":3,\"name\":\"pull_image\""
+# #endregion
 debug "Step 3: Pulling image"
 echo "Pulling image: $IMAGE"
-if ! docker pull "$IMAGE"; then
+PULL_ERR=$(docker pull "$IMAGE" 2>&1); PULL_RET=$?
+if [ "$PULL_RET" -ne 0 ]; then
+  dbg_log "step_failed" "\"step\":3,\"error\":\"$(sanitize_err "$PULL_ERR")\""
   echo "Error: failed to pull $IMAGE" >&2
+  echo "$PULL_ERR" >&2
+  show_docker_permission_hint "$PULL_ERR" "$@"
   exit 1
 fi
 
 # --- Step 4: Optional DB init ---
 if [ "$RUN_INIT_DB" = "1" ]; then
+  # #region agent log
+  dbg_log "step_start" "\"step\":4,\"name\":\"init_db\""
+  # #endregion
   debug "Step 4a: Running Snowflake schema init"
   echo "Running one-time DB init (Snowflake schema)..."
-  if ! docker run --rm --env-file .env "$IMAGE" node server/db/init.js; then
+  INIT_ERR=$(docker run --rm --env-file .env "$IMAGE" node server/db/init.js 2>&1); INIT_RET=$?
+  if [ "$INIT_RET" -ne 0 ]; then
+    dbg_log "step_failed" "\"step\":4,\"error\":\"$(sanitize_err "$INIT_ERR")\""
     echo "DB init failed. Fix .env (e.g. Snowflake credentials, MFA passcode) and run again with --init-db." >&2
+    echo "$INIT_ERR" >&2
+    show_docker_permission_hint "$INIT_ERR" "$@"
     exit 1
   fi
   echo "DB init completed."
@@ -132,6 +169,9 @@ if [ "$RUN_MIGRATE" = "1" ]; then
 fi
 
 # --- Step 6: Clean existing container ---
+# #region agent log
+dbg_log "step_start" "\"step\":6,\"name\":\"clean_container\""
+# #endregion
 debug "Step 6: Cleaning existing container"
 EXISTING=$(docker ps -a -q -f "name=^${CONTAINER_NAME}$" 2>/dev/null || true)
 if [ -n "$EXISTING" ]; then
@@ -141,6 +181,9 @@ if [ -n "$EXISTING" ]; then
 fi
 
 # --- Step 7: Run container ---
+# #region agent log
+dbg_log "step_start" "\"step\":7,\"name\":\"run_container\""
+# #endregion
 debug "Step 7: Running container"
 DETACH="-d"
 [ "$FOREGROUND" = "1" ] && DETACH=""
@@ -150,7 +193,14 @@ if [ "$FOREGROUND" = "1" ]; then
   exec docker run -p "${PORT}:8000" --name "$CONTAINER_NAME" --env-file .env --rm $DETACH "$IMAGE"
 fi
 
-docker run $DETACH -p "${PORT}:8000" --name "$CONTAINER_NAME" --env-file .env --restart unless-stopped "$IMAGE"
+RUN_ERR=$(docker run $DETACH -p "${PORT}:8000" --name "$CONTAINER_NAME" --env-file .env --restart unless-stopped "$IMAGE" 2>&1); RUN_RET=$?
+if [ "$RUN_RET" -ne 0 ]; then
+  dbg_log "step_failed" "\"step\":7,\"error\":\"$(sanitize_err "$RUN_ERR")\""
+  echo "Error: failed to run container" >&2
+  echo "$RUN_ERR" >&2
+  show_docker_permission_hint "$RUN_ERR" "$@"
+  exit 1
+fi
 
 echo ""
 echo "Comunitree is running."
