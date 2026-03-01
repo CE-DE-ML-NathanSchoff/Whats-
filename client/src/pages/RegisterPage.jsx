@@ -1,11 +1,33 @@
 import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
+import { motion, AnimatePresence } from 'framer-motion'
 
 const roboto = { fontFamily: "'Roboto', sans-serif" }
 const poppins = { fontFamily: "'Poppins', sans-serif" }
 const inputStyle = { border: '1px solid rgba(40,51,45,0.2)', ...roboto }
 const baseInput = 'w-full h-full px-3 bg-white rounded-[5px] text-[17px] text-[#28332D] placeholder:text-[#28332D]/30 outline-none'
+
+const USER_TYPES = [
+  {
+    id: 'user',
+    icon: '🧭',
+    title: 'User',
+    subtitle: 'Exploring the community',
+    borderSelected: '#74C69D',
+    bgSelected: 'rgba(116,198,157,0.1)',
+    dotColor: '#74C69D',
+  },
+  {
+    id: 'business',
+    icon: '🏪',
+    title: 'Business',
+    subtitle: 'Shop, restaurant, studio or org',
+    borderSelected: '#FFD700',
+    bgSelected: 'rgba(255,215,0,0.08)',
+    dotColor: '#FFD700',
+  },
+]
 
 function GoogleIcon() {
   return (
@@ -70,23 +92,40 @@ export default function RegisterPage() {
   const [showPw, setShowPw] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
   const [name, setName] = useState('')
+  const [area, setArea] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [selectedType, setSelectedType] = useState('user')
+  const [businessName, setBusinessName] = useState('')
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [errorMsg, setErrorMsg] = useState('')
 
   const handleCreate = async () => {
     setError('')
-    if (password !== confirmPassword) {
-      setError('Passwords do not match')
+    setErrorMsg('')
+    if (!name || !area || !email || !password || !confirmPassword) {
+      setErrorMsg('Please fill in all fields.')
       return
     }
+    if (password !== confirmPassword) {
+      setError('Passwords do not match')
+      setErrorMsg('Passwords do not match.')
+      return
+    }
+    setLoading(true)
     try {
-      await auth.register({ username: email, email, password, display_name: name })
-      navigate('/map')
+      await auth.register({
+        username: email, email, password, display_name: name,
+        area, user_type: selectedType,
+        business_name: selectedType === 'business' ? businessName : null,
+      })
+      navigate('/onboarding')
     } catch (err) {
       setError(err.message || 'Registration failed')
     }
+    setLoading(false)
   }
 
   return (
@@ -114,36 +153,43 @@ export default function RegisterPage() {
             Create New Account
           </h2>
 
+          {errorMsg && (
+            <p className="text-red-500 text-xs mb-3 text-center">
+              {errorMsg}
+            </p>
+          )}
+
           {/* Name */}
           <Field label="Name">
             <input
               type="text"
-              placeholder="E.g: Arjun Das"
+              placeholder="E.g: John Cena"
               className={baseInput}
               style={inputStyle}
               value={name}
-              onChange={e => setName(e.target.value)}
+onChange={(e) => setName(e.target.value)}
             />
           </Field>
 
-          {/* Neighborhood / Area */}
-          <Field label="Neighborhood / Area">
-            <select
-              className={`${baseInput} appearance-none pr-8`}
-              style={inputStyle}
-              defaultValue=""
-            >
-              <option value="" disabled>Select your area</option>
-              <option>Downtown</option>
-              <option>East Side</option>
-              <option>West End</option>
-              <option>North Park</option>
-              <option>South Hill</option>
-            </select>
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[10px] text-[#28332D]">
-              ▼
-            </span>
-          </Field>
+          {/* Community / Area */}
+          <div className="mb-5">
+            <p className="text-[14px] leading-[22px] text-[#28332D] mb-[2px]" style={roboto}>
+              Community
+            </p>
+            <div className="relative h-[42px]">
+              <input
+                type="text"
+                placeholder="Type your community name..."
+                className={baseInput}
+                style={inputStyle}
+                value={area}
+                onChange={(e) => setArea(e.target.value)}
+              />
+            </div>
+            <p style={{ fontFamily: "'Roboto', sans-serif", fontWeight: 400, fontSize: 11, color: '#74C69D', marginTop: 4 }}>
+              Enter your city, street, or local area
+            </p>
+          </div>
 
           {/* Email */}
           <Field label="Email Address">
@@ -153,7 +199,7 @@ export default function RegisterPage() {
               className={baseInput}
               style={inputStyle}
               value={email}
-              onChange={e => setEmail(e.target.value)}
+onChange={(e) => setEmail(e.target.value)}
             />
           </Field>
 
@@ -165,7 +211,7 @@ export default function RegisterPage() {
               className={`${baseInput} pr-10`}
               style={inputStyle}
               value={password}
-              onChange={e => setPassword(e.target.value)}
+onChange={(e) => setPassword(e.target.value)}
             />
             <EyeToggle show={showPw} onToggle={() => setShowPw(v => !v)} />
           </Field>
@@ -178,18 +224,109 @@ export default function RegisterPage() {
               className={`${baseInput} pr-10`}
               style={inputStyle}
               value={confirmPassword}
-              onChange={e => setConfirmPassword(e.target.value)}
+onChange={(e) => setConfirmPassword(e.target.value)}
             />
             <EyeToggle show={showConfirm} onToggle={() => setShowConfirm(v => !v)} />
           </Field>
 
+          {/* I am a... — user type picker */}
+          <div className="mb-5">
+            <p className="text-[14px] leading-[22px] text-[#28332D] mb-2" style={poppins}>
+              I am a...
+            </p>
+            {USER_TYPES.map((opt) => {
+              const active = selectedType === opt.id
+              return (
+                <motion.button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setSelectedType(opt.id)}
+                  whileTap={{ scale: 0.97 }}
+                  className="w-full flex items-center justify-between text-left border-none cursor-pointer"
+                  style={{
+                    borderRadius: 12,
+                    padding: 14,
+                    marginBottom: 8,
+                    border: `1.5px solid ${active ? opt.borderSelected : 'rgba(82,183,136,0.15)'}`,
+                    background: active ? opt.bgSelected : 'transparent',
+                    transition: 'border-color 0.15s, background 0.15s',
+                  }}
+                >
+                  <div>
+                    <p style={{
+                      ...poppins,
+                      fontWeight: 600,
+                      fontSize: 14,
+                      color: '#28332D',
+                      marginBottom: 2,
+                    }}>
+                      {opt.icon} {opt.title}
+                    </p>
+                    <p style={{
+                      ...roboto,
+                      fontWeight: 400,
+                      fontSize: 11,
+                      color: '#74C69D',
+                    }}>
+                      {opt.subtitle}
+                    </p>
+                  </div>
+                  {/* Radio dot */}
+                  <div style={{
+                    width: 14,
+                    height: 14,
+                    borderRadius: '50%',
+                    flexShrink: 0,
+                    marginLeft: 12,
+                    border: active ? `2px solid ${opt.dotColor}` : '2px solid rgba(82,183,136,0.3)',
+                    background: active ? opt.dotColor : 'transparent',
+                    transition: 'background 0.15s, border-color 0.15s',
+                  }} />
+                </motion.button>
+              )
+            })}
+
+            {/* Business name — conditional slide-down */}
+            <AnimatePresence initial={false}>
+              {selectedType === 'business' && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.25 }}
+                  style={{ overflow: 'hidden' }}
+                >
+                  <div className="mt-1">
+                    <p className="text-[14px] leading-[22px] text-[#28332D] mb-[2px]" style={poppins}>
+                      Business Name
+                    </p>
+                    <div className="relative h-[42px]">
+                      <input
+                        type="text"
+                        placeholder="e.g. Clark Park Cafe, Philly Yoga Studio"
+                        className={baseInput}
+                        style={inputStyle}
+                        value={businessName}
+                        onChange={(e) => setBusinessName(e.target.value)}
+                      />
+                    </div>
+                    <p style={{ ...roboto, fontWeight: 400, fontSize: 11, color: '#74C69D', marginTop: 4 }}>
+                      This will appear on all your events
+                    </p>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
           {/* CREATE ACCOUNT NOW */}
           <button
-            className="w-full h-[46px] rounded-[5px] border-none text-white text-[17px] font-medium cursor-pointer mt-1 mb-6"
+            className="w-full h-[46px] rounded-[5px] border-none text-white text-[17px] font-medium cursor-pointer flex items-center justify-center disabled:opacity-70 mt-1 mb-6"
             style={{ background: '#1BBC65', ...roboto }}
             onClick={handleCreate}
+            disabled={loading}
           >
-            CREATE ACCOUNT NOW
+            {loading ? 'CREATING...' : 'CREATE ACCOUNT NOW'}
           </button>
           {error && (
             <p className="text-red-500 text-[13px] mt-2" style={roboto}>{error}</p>

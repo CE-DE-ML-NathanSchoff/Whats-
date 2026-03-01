@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Map } from '@vis.gl/react-maplibre'
 import 'maplibre-gl/dist/maplibre-gl.css'
 
-import SeedMarker from '../components/Map/SeedMarker'
+import SeedMarker, { isFallen, isDecayed } from '../components/Map/SeedMarker'
 import BranchLines from '../components/Map/BranchLines'
 import SearchBar from '../components/Map/SearchBar'
 import FilterSheet from '../components/Map/FilterSheet'
@@ -15,56 +15,200 @@ import BottomNav from '../components/Nav/BottomNav'
 import { events as eventsApi, communities as communitiesApi } from '../lib/api'
 import { useSocket } from '../hooks/useSocket'
 import { useAuth } from '../context/AuthContext'
+import { useTheme } from '../context/ThemeContext'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const PHILLY = { longitude: -75.1652, latitude: 39.9526 }
 
 const DEFAULT_FILTERS = {
-  stages:   [],
+  stages: [],
   distance: '10 mi',
-  time:     'Any',
-  type:     'All',
-  sort:     'Newest',
+  time: 'Any',
+  type: 'All',
+  sort: 'Newest',
+  showFallen: false,
 }
 
 // ─── Hardcoded test data ──────────────────────────────────────────────────────
 
 const SEED_POSTS = [
+
+  // ── Active public tree ──
   {
     id: 1,
     title: 'Saturday Farmers Market 🌽',
     content: 'Fresh local produce every Saturday morning at Clark Park. Bring your own bags!',
+    link: 'https://clarkparkfarmersmarket.com',
+    event_time: '2026-03-08T09:00:00',
+    timezone: 'America/New_York',
+    location: 'Clark Park, Philadelphia',
     lat: 39.9541, lng: -75.1878,
-    waters_count: 0, growth_stage: 'seed', is_branch: false,
+    waters_count: 12, growth_stage: 'oak',
+    is_branch: false, branch_count: 2,
+    privacy: 'public',
+    author: {
+      id: 'u1', username: 'alex_r', initials: 'AR',
+      user_type: 'local', community: 'West Philadelphia',
+      verified: false, trees: 7, waters: 34, branches: 3,
+      friendship_status: 'none',
+    },
   },
+
+  // ── Active branch of post 1 ──
   {
     id: 2,
-    title: 'Sunday Morning Yoga 🧘',
-    content: 'Free community yoga in Fairmount Park every Sunday at 8am. All levels welcome.',
-    lat: 39.9726, lng: -75.1895,
-    waters_count: 4, growth_stage: 'sapling', is_branch: true, parent_id: 3,
+    title: 'Live Cooking Demo 🍳',
+    content: 'Watch Chef Maria cook with seasonal market ingredients. Free samples!',
+    link: null,
+    event_time: '2026-03-08T11:00:00',
+    timezone: 'America/New_York',
+    location: 'Clark Park, Philadelphia',
+    lat: 39.9555, lng: -75.1860,
+    waters_count: 4, growth_stage: 'sapling',
+    is_branch: true, parent_id: 1, branch_count: 0,
+    privacy: 'public',
+    author: {
+      id: 'u2', username: 'chef_maria', initials: 'CM',
+      user_type: 'business', business_name: "Maria's Kitchen",
+      community: 'West Philadelphia',
+      verified: true, trees: 3, waters: 18, branches: 1,
+      friendship_status: 'friends',
+    },
   },
+
+  // ── Active private group tree ──
   {
     id: 3,
-    title: 'Neighborhood Cleanup 🌳',
-    content: 'Monthly cleanup crew keeping our streets beautiful. Gloves provided!',
+    title: 'Neighborhood Watch Meeting 🔒',
+    content: 'Monthly safety and community update for West Philly residents.',
+    link: 'https://forms.gle/example',
+    event_time: '2026-03-12T19:00:00',
+    timezone: 'America/New_York',
+    location: '52nd Street Community Center',
     lat: 39.9621, lng: -75.1712,
-    waters_count: 12, growth_stage: 'oak', is_branch: false,
+    waters_count: 6, growth_stage: 'tree',
+    is_branch: false, branch_count: 1,
+    privacy: 'private_group',
+    author: {
+      id: 'u3', username: 'block_captain', initials: 'BC',
+      user_type: 'local', community: 'West Philadelphia',
+      verified: false, trees: 4, waters: 22, branches: 2,
+      friendship_status: 'friends',
+    },
   },
+
+  // ── Active invite-only tree ──
   {
     id: 4,
-    title: 'Community Garden 🌿',
-    content: 'New raised beds available for the season. Sign up at the rec center.',
+    title: 'Secret Rooftop Dinner 🌙',
+    content: 'Private dinner for the founding members of our community group.',
+    link: null,
+    event_time: '2026-03-15T19:30:00',
+    timezone: 'America/New_York',
+    location: null,
     lat: 39.9448, lng: -75.1602,
-    waters_count: 2, growth_stage: 'sprout', is_branch: false,
+    waters_count: 3, growth_stage: 'sapling',
+    is_branch: false, branch_count: 0,
+    privacy: 'invite_only',
+    members: [
+      { id: 1, username: 'alex_r',   initials: 'AR', role: 'creator', status: 'accepted' },
+      { id: 2, username: 'maya_w',   initials: 'MW', role: 'member',  status: 'accepted' },
+      { id: 3, username: 'jordan_k', initials: 'JK', role: 'member',  status: 'pending'  },
+    ],
+    author: {
+      id: 'u4', username: 'maya_w', initials: 'MW',
+      user_type: 'local', community: 'West Philadelphia',
+      verified: false, trees: 2, waters: 9, branches: 0,
+      friendship_status: 'none',
+    },
   },
+
+  // ── Active sprout ──
   {
     id: 5,
+    title: 'Community Garden Workday 🌿',
+    content: 'New raised beds available this season. Gloves and tools provided!',
+    link: 'https://phillygarden.org',
+    event_time: '2026-03-22T10:00:00',
+    timezone: 'America/New_York',
+    location: 'Kingsessing Recreation Center Garden',
+    lat: 39.9381, lng: -75.1823,
+    waters_count: 2, growth_stage: 'sprout',
+    is_branch: false, branch_count: 0,
+    privacy: 'public',
+    author: {
+      id: 'u5', username: 'green_philly', initials: 'GP',
+      user_type: 'business', business_name: 'Green Philly Org',
+      community: 'Kingsessing',
+      verified: true, trees: 12, waters: 89, branches: 5,
+      friendship_status: 'none',
+    },
+  },
+
+  // ── Recently fallen tree (event just passed) ──
+  {
+    id: 6,
+    title: 'Jazz Night at Clark Park 🎷',
+    content: 'What an incredible night! Thank you to all 40+ neighbors who came out.',
+    link: null,
+    event_time: '2026-02-22T20:00:00',
+    timezone: 'America/New_York',
+    location: 'Clark Park Amphitheater',
+    lat: 39.9480, lng: -75.1750,
+    waters_count: 9, growth_stage: 'tree',
+    is_branch: false, branch_count: 1,
+    privacy: 'public',
+    author: {
+      id: 'u6', username: 'jazz_collective', initials: 'JC',
+      user_type: 'local', community: 'West Philadelphia',
+      verified: false, trees: 5, waters: 31, branches: 2,
+      friendship_status: 'friends',
+    },
+  },
+
+  // ── Fully decayed tree (7+ days past) ──
+  {
+    id: 7,
+    title: 'Winter Coat Drive 🧥',
+    content: 'We collected over 200 coats. This neighborhood is incredible. Thank you all.',
+    link: 'https://coatdrive.org/results',
+    event_time: '2026-02-01T10:00:00',
+    timezone: 'America/New_York',
+    location: 'University City Community Center',
+    lat: 39.9560, lng: -75.1800,
+    waters_count: 14, growth_stage: 'oak',
+    is_branch: false, branch_count: 3,
+    privacy: 'public',
+    author: {
+      id: 'u7', username: 'community_org', initials: 'CO',
+      user_type: 'business', business_name: 'West Philly Community Org',
+      community: 'West Philadelphia',
+      verified: true, trees: 18, waters: 142, branches: 9,
+      friendship_status: 'none',
+    },
+  },
+
+  // ── New seed just planted ──
+  {
+    id: 8,
     title: 'Book Swap at Library 📚',
     content: 'Bring a book, take a book. Every Tuesday at Kingsessing Library.',
-    lat: 39.9381, lng: -75.1823,
-    waters_count: 7, growth_stage: 'tree', is_branch: false,
+    link: null,
+    event_time: '2026-03-05T17:00:00',
+    timezone: 'America/New_York',
+    location: 'Kingsessing Library, Philadelphia',
+    lat: 39.9510, lng: -75.1690,
+    waters_count: 0, growth_stage: 'seed',
+    is_branch: false, branch_count: 0,
+    privacy: 'public',
+    author: {
+      id: 'u8', username: 'kingsessing_lib', initials: 'KL',
+      user_type: 'business', business_name: 'Kingsessing Library',
+      community: 'Kingsessing',
+      verified: true, trees: 6, waters: 44, branches: 2,
+      friendship_status: 'none',
+    },
   },
 ]
 
@@ -85,10 +229,10 @@ const getDistanceMiles = (lat1, lng1, lat2, lng2) => {
 const DISTANCE_MILES = {
   'Nearby': 0.5,
   '0.5 mi': 0.5,
-  '1 mi':   1,
-  '2 mi':   2,
-  '5 mi+':  5,
-  '10 mi':  999,
+  '1 mi': 1,
+  '2 mi': 2,
+  '5 mi+': 5,
+  '10 mi': 999,
 }
 
 // ─── Transform backend event to UI post format ──────────────────────────────
@@ -134,29 +278,36 @@ function spreadPosts(posts) {
 
 export default function MapPage() {
   const navigate = useNavigate()
-  const mapRef   = useRef(null)
+  const mapRef = useRef(null)
+  const { isDark } = useTheme()
 
-  const [posts, setPosts]               = useState(SEED_POSTS)
-  const [plantOpen, setPlantOpen]       = useState(false)
-  const [clickCoords, setClickCoords]   = useState(null)
+  const [posts, setPosts] = useState(SEED_POSTS)
+  const [plantOpen, setPlantOpen] = useState(false)
+  const [clickCoords, setClickCoords] = useState(null)
   const [selectedPost, setSelectedPost] = useState(null)
-  const [filters, setFilters]           = useState(DEFAULT_FILTERS)
-  const [filterOpen, setFilterOpen]     = useState(false)
-  const [pickerPosts, setPickerPosts]   = useState([])
-  const [pickerOpen, setPickerOpen]     = useState(false)
+  const [filters, setFilters] = useState(DEFAULT_FILTERS)
+  const [filterOpen, setFilterOpen] = useState(false)
+  const [pickerPosts, setPickerPosts] = useState([])
+  const [pickerOpen, setPickerOpen] = useState(false)
   const [currentLocation, setCurrentLocation] = useState({
     name: 'West Philadelphia',
-    lat:  39.9526,
-    lng:  -75.1652,
+    lat: 39.9526,
+    lng: -75.1652,
   })
   const [locationPickerOpen, setLocationPickerOpen] = useState(false)
+
+  function handleTestFallen() {
+    setPosts((prev) => prev.map((p) =>
+      p.id === 1 ? { ...p, event_time: new Date(Date.now() - 86400000).toISOString() } : p
+    ))
+  }
 
   const handleLocationChange = useCallback((loc) => {
     setCurrentLocation(loc)
     setLocationPickerOpen(false)
     mapRef.current?.flyTo({
-      center:   [loc.lng, loc.lat],
-      zoom:     14,
+      center: [loc.lng, loc.lat],
+      zoom: 14,
       duration: 1200,
       essential: true,
     })
@@ -202,6 +353,7 @@ export default function MapPage() {
   // ── Filtered posts ──────────────────────────────────────────────────────────
   const filteredPosts = useMemo(() =>
     posts
+      .filter((p) => filters.showFallen || !isDecayed(p))
       .filter((p) =>
         filters.stages.length === 0 ||
         filters.stages.includes(p.growth_stage)
@@ -216,8 +368,8 @@ export default function MapPage() {
       })
       .filter((p) =>
         filters.type === 'All' ||
-        (filters.type === 'Trees Only'    && !p.is_branch) ||
-        (filters.type === 'Branches Only' &&  p.is_branch)
+        (filters.type === 'Trees Only' && !p.is_branch) ||
+        (filters.type === 'Branches Only' && p.is_branch)
       )
       .sort((a, b) =>
         filters.sort === 'Most Watered'
@@ -233,9 +385,9 @@ export default function MapPage() {
   const activeFilterCount =
     filters.stages.length +
     (filters.distance !== '10 mi' ? 1 : 0) +
-    (filters.time     !== 'Any'    ? 1 : 0) +
-    (filters.type     !== 'All'    ? 1 : 0) +
-    (filters.sort     !== 'Newest' ? 1 : 0)
+    (filters.time !== 'Any' ? 1 : 0) +
+    (filters.type !== 'All' ? 1 : 0) +
+    (filters.sort !== 'Newest' ? 1 : 0)
 
   // ── Map click — proximity detection ────────────────────────────────────────
   const handleMapClick = useCallback((e) => {
@@ -267,13 +419,16 @@ export default function MapPage() {
   }, [])
 
   return (
-    <div className="relative w-[360px] h-[640px] overflow-hidden bg-[#0D1F16]">
+    <div
+      className="relative w-[360px] h-[640px] overflow-hidden"
+      style={{ background: isDark ? '#0D1F16' : '#F4FAF6', transition: 'background 0.3s ease' }}
+    >
       {/* Map */}
       <Map
         ref={mapRef}
         initialViewState={{ ...PHILLY, zoom: 14 }}
         style={{ width: '100%', height: '100%' }}
-        mapStyle="https://tiles.openfreemap.org/styles/dark"
+        mapStyle={isDark ? "https://tiles.openfreemap.org/styles/dark" : "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json"}
         attributionControl={false}
         onClick={handleMapClick}
       >
@@ -283,22 +438,24 @@ export default function MapPage() {
         ))}
       </Map>
 
-      {/* Search bar — floats over map */}
-      <SearchBar
-        onTap={() => navigate('/explore')}
-        onFilterOpen={() => setFilterOpen(true)}
-        activeFilterCount={activeFilterCount}
-      />
+      {/* Search bar — floats over map, hidden while planting */}
+      {!plantOpen && (
+        <SearchBar
+          onTap={() => navigate('/explore')}
+          onFilterOpen={() => setFilterOpen(true)}
+          activeFilterCount={activeFilterCount}
+        />
+      )}
 
       {/* Location indicator — tappable */}
       <button
         className="absolute left-1/2 -translate-x-1/2 z-20 border-none cursor-pointer"
         style={{
-          bottom: 72,
-          background: 'rgba(13,31,22,0.85)',
+          bottom: 88,
+          background: isDark ? 'rgba(13,31,22,0.85)' : 'rgba(255,255,255,0.9)',
           backdropFilter: 'blur(8px)',
           WebkitBackdropFilter: 'blur(8px)',
-          border: '1px solid rgba(82,183,136,0.25)',
+          border: isDark ? '1px solid rgba(82,183,136,0.25)' : '1px solid rgba(45,106,79,0.2)',
           borderRadius: 20,
           padding: '6px 14px',
         }}
@@ -309,7 +466,7 @@ export default function MapPage() {
             fontFamily: "'Poppins', sans-serif",
             fontWeight: 500,
             fontSize: 12,
-            color: '#95D5B2',
+            color: isDark ? '#95D5B2' : '#2D6A4F',
           }}
         >
           📍 {currentLocation.name}
@@ -342,7 +499,21 @@ export default function MapPage() {
       <PostCard
         post={selectedPost}
         onClose={() => setSelectedPost(null)}
+        onAddBranch={(post) => {
+          setSelectedPost(null)
+          setClickCoords({ lat: post.lat, lng: post.lng })
+          setPlantOpen(true)
+        }}
       />
+
+      {/* Dev: test fallen tree */}
+      <button
+        onClick={handleTestFallen}
+        className="absolute border-none cursor-pointer"
+        style={{ bottom: 72, left: 8, background: 'transparent', fontSize: 8, color: 'rgba(255,255,255,0.3)', opacity: 0.3, padding: 2 }}
+      >
+        🍂 Test Fallen
+      </button>
 
       {/* Bottom nav */}
       <BottomNav />

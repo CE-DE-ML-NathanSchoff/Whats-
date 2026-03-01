@@ -59,16 +59,25 @@ export default function LoginPage() {
   const [showPw, setShowPw] = useState(false)
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [errorMsg, setErrorMsg] = useState('')
 
   const handleLogin = async () => {
+    if (!username || !password) {
+      setErrorMsg('Please enter both email and password.')
+      return
+    }
     setError('')
+    setErrorMsg('')
+    setLoading(true)
     try {
       await auth.login(username, password)
       navigate('/map')
     } catch (err) {
       setError(err.message || 'Login failed')
     }
+    setLoading(false)
   }
 
   return (
@@ -96,14 +105,20 @@ export default function LoginPage() {
           Login
         </h2>
 
+        {errorMsg && (
+          <p className="absolute left-10 top-[60px] w-[280px] text-red-500 text-xs text-center">
+            {errorMsg}
+          </p>
+        )}
+
         {/* User Name label */}
         <label className="absolute left-10 top-[79px] text-[14px] leading-[22px] text-[#28332D]" style={roboto}>
-          User Name
+          Email Address
         </label>
 
         {/* Username input */}
         <div className="absolute left-10 top-[103px] w-[280px] h-[42px]">
-          <input type="text" placeholder="Email / Phone Number" className={baseInput} style={inputStyle} value={username} onChange={e => setUsername(e.target.value)} />
+          <input type="text" placeholder="Email / Phone Number" className={baseInput} style={inputStyle} value={username} onChange={(e) => setUsername(e.target.value)} />
         </div>
 
         {/* Password label + Forgot Password */}
@@ -125,18 +140,19 @@ export default function LoginPage() {
             className={`${baseInput} pr-10`}
             style={inputStyle}
             value={password}
-            onChange={e => setPassword(e.target.value)}
+            onChange={(e) => setPassword(e.target.value)}
           />
           <EyeToggle show={showPw} onToggle={() => setShowPw(v => !v)} />
         </div>
 
         {/* LOGIN NOW */}
         <button
-          className="absolute left-10 top-[256px] w-[280px] h-[46px] rounded-[5px] border-none text-white text-[17px] font-medium cursor-pointer"
+          className="absolute left-10 top-[256px] w-[280px] h-[46px] rounded-[5px] border-none text-white text-[17px] font-medium cursor-pointer flex items-center justify-center disabled:opacity-70"
           style={{ background: '#1BBC65', ...roboto }}
           onClick={handleLogin}
+          disabled={loading}
         >
-          LOGIN NOW
+          {loading ? 'LOGGING IN...' : 'LOGIN NOW'}
         </button>
         {error && (
           <p className="absolute left-10 top-[308px] w-[280px] text-red-500 text-[13px]" style={roboto}>{error}</p>
@@ -167,8 +183,8 @@ export default function LoginPage() {
 
         {/* Don't have an account */}
         <p
-          className="absolute text-center text-[14px] leading-[28px] text-[#28332D]"
-          style={{ left: 102, top: 469, width: 166, ...roboto }}
+          className="absolute w-full text-center text-[14px] leading-[28px] text-[#28332D]"
+          style={{ top: 469, ...roboto }}
         >
           Don't have an account?{' '}
           <button

@@ -14,19 +14,19 @@ const DEFAULT_FILTERS = {
 // ─── Mock data ───────────────────────────────────────────────────────────────
 
 const INITIAL_SIMILAR = [
-  { id: 30, username: 'Kenji M.',   sharedTrees: 4, lastInteraction: '2h ago',  interests: ['Tech', 'Music'], added: false },
-  { id: 31, username: 'Olivia R.',  sharedTrees: 3, lastInteraction: '5m ago',  interests: ['Art', 'Markets'], added: false },
-  { id: 32, username: 'Marcus D.', sharedTrees: 3, lastInteraction: '1d ago',  interests: ['Outdoors', 'Fitness'], added: false },
-  { id: 33, username: 'Jordan T.',  sharedTrees: 2, lastInteraction: 'just now', interests: ['Food & Drink'], added: false },
-  { id: 34, username: 'Priya S.',   sharedTrees: 2, lastInteraction: '3h ago',  interests: ['Workshops', 'Art'], added: false },
+  { id: 30, username: 'Kenji M.', sharedTrees: 4, lastInteraction: '2h ago', interests: ['Tech', 'Music'], added: false },
+  { id: 31, username: 'Olivia R.', sharedTrees: 3, lastInteraction: '5m ago', interests: ['Art', 'Markets'], added: false },
+  { id: 32, username: 'Marcus D.', sharedTrees: 3, lastInteraction: '1d ago', interests: ['Outdoors', 'Fitness'], added: false },
+  { id: 33, username: 'Jordan T.', sharedTrees: 2, lastInteraction: 'just now', interests: ['Food & Drink'], added: false },
+  { id: 34, username: 'Priya S.', sharedTrees: 2, lastInteraction: '3h ago', interests: ['Workshops', 'Art'], added: false },
 ]
 
 const INITIAL_NEARBY = [
-  { id: 20, username: 'Aisha L.',   neighborhood: 'West Philadelphia', distanceMi: 1.2, interests: ['Markets', 'Food & Drink'], added: false },
-  { id: 21, username: 'Jordan T.',  neighborhood: 'West Philadelphia', distanceMi: 2.3, interests: ['Fitness', 'Music'], added: false },
-  { id: 22, username: 'Priya S.',  neighborhood: 'University City',   distanceMi: 0.8, interests: ['Art', 'Workshops'], added: false },
-  { id: 23, username: 'Dana T.',   neighborhood: 'Fairmount',         distanceMi: 4.1, interests: ['Outdoors', 'Volunteering'], added: false },
-  { id: 24, username: 'Chris W.',  neighborhood: 'South Philly',      distanceMi: 5.5, interests: ['Music', 'Networking'], added: false },
+  { id: 20, username: 'Aisha L.', community: 'West Philadelphia', distanceMi: 1.2, interests: ['Markets', 'Food & Drink'], added: false },
+  { id: 21, username: 'Jordan T.', community: 'West Philadelphia', distanceMi: 2.3, interests: ['Fitness', 'Music'], added: false },
+  { id: 22, username: 'Priya S.', community: 'University City', distanceMi: 0.8, interests: ['Art', 'Workshops'], added: false },
+  { id: 23, username: 'Dana T.', community: 'Fairmount', distanceMi: 4.1, interests: ['Outdoors', 'Volunteering'], added: false },
+  { id: 24, username: 'Chris W.', community: 'South Philly', distanceMi: 5.5, interests: ['Music', 'Networking'], added: false },
 ]
 
 // ─── Section header ──────────────────────────────────────────────────────────
@@ -107,10 +107,10 @@ function matchesSearch(person, query) {
 
 export default function FindFriendsPage() {
   const navigate = useNavigate()
-  const [similar, setSimilar]   = useState(INITIAL_SIMILAR)
-  const [nearby, setNearby]     = useState(INITIAL_NEARBY)
+  const [similar, setSimilar] = useState(INITIAL_SIMILAR)
+  const [nearby, setNearby] = useState(INITIAL_NEARBY)
   const [searchQuery, setSearchQuery] = useState('')
-  const [filters, setFilters]   = useState(DEFAULT_FILTERS)
+  const [filters, setFilters] = useState(DEFAULT_FILTERS)
   const [filterOpen, setFilterOpen] = useState(false)
 
   const activeFilterCount =
@@ -138,18 +138,18 @@ export default function FindFriendsPage() {
   const markSimilarAdded = async (id) => {
     try {
       await usersApi.sendFriendRequest(id);
-      setSimilar((prev) => prev.map((p) => (p.id === id ? { ...p, added: true } : p)));
     } catch (err) {
       console.error('Failed to send friend request', err);
     }
+    setSimilar((prev) => prev.map((p) => (p.id === id ? { ...p, added: true } : p)));
   };
   const markNearbyAdded = async (id) => {
     try {
       await usersApi.sendFriendRequest(id);
-      setNearby((prev) => prev.map((p) => (p.id === id ? { ...p, added: true } : p)));
     } catch (err) {
       console.error('Failed to send friend request', err);
     }
+    setNearby((prev) => prev.map((p) => (p.id === id ? { ...p, added: true } : p)));
   };
 
   return (
@@ -164,7 +164,7 @@ export default function FindFriendsPage() {
           aria-label="Back"
         >
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-            <path d="M15 19l-7-7 7-7" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M15 19l-7-7 7-7" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </motion.button>
         <div className="flex-1 min-w-0">
@@ -192,7 +192,7 @@ export default function FindFriendsPage() {
           <input
             className="flex-1 bg-transparent border-none outline-none text-white placeholder-white/30"
             style={{ fontFamily: "'Poppins', sans-serif", fontSize: 13 }}
-            placeholder="Search by username, interests, neighborhood..."
+            placeholder="Search by username, interests, community..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
