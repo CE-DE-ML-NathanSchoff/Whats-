@@ -15,6 +15,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ENV_FILE="${SCRIPT_DIR}/.env"
 ENV_EXAMPLE="${SCRIPT_DIR}/.env.example"
+ENV_EXAMPLE_RAW_URL="${ENV_EXAMPLE_RAW_URL:-https://raw.githubusercontent.com/CE-DE-ML-NathanSchoff/Whats-/main/.env.example}"
 IMAGE="${IMAGE:-ghcr.io/ce-de-ml-nathanschoff/whats:main}"
 PORT="${PORT:-8000}"
 CONTAINER_NAME="${CONTAINER_NAME:-comunitree}"
@@ -61,14 +62,27 @@ fi
 debug "Step 2: Ensuring .env"
 need_env_prompt=0
 if [ ! -f "$ENV_FILE" ]; then
+  if [ ! -f "$ENV_EXAMPLE" ]; then
+    if command -v wget >/dev/null 2>&1; then
+      echo "No .env.example found. Downloading latest from repo..."
+      if wget --no-cache -q -O "$ENV_EXAMPLE" "$ENV_EXAMPLE_RAW_URL" 2>/dev/null; then
+        echo "Downloaded .env.example from $ENV_EXAMPLE_RAW_URL"
+      else
+        rm -f "$ENV_EXAMPLE"
+        echo "Error: No .env or .env.example found in: $SCRIPT_DIR" >&2
+        echo "Run this script from the Comunitree repo root (where .env.example lives), or copy .env.example there." >&2
+        exit 1
+      fi
+    else
+      echo "Error: No .env or .env.example found in: $SCRIPT_DIR" >&2
+      echo "Run this script from the Comunitree repo root (where .env.example lives), or copy .env.example there." >&2
+      exit 1
+    fi
+  fi
   if [ -f "$ENV_EXAMPLE" ]; then
     cp "$ENV_EXAMPLE" "$ENV_FILE"
     echo "Created .env from .env.example."
     need_env_prompt=1
-  else
-    echo "Error: No .env or .env.example found in: $SCRIPT_DIR" >&2
-    echo "Run this script from the Comunitree repo root (where .env.example lives), or copy .env.example there." >&2
-    exit 1
   fi
 else
   # Check for placeholders
