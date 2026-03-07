@@ -1,6 +1,6 @@
-# How Roots Works
+# How Communitree Works
 
-Roots is a hyperlocal community platform where neighbors discover events on a living map. Posts appear as seeds and grow into trees as people engage — no DMs, all interaction is public or group-based.
+Communitree is a hyperlocal community platform where neighbors discover events on a living map. Posts appear as seeds and grow into trees as people engage — no DMs, all interaction is public or group-based.
 
 ![Communitree](./presentation_images/slide_01.png)
 
